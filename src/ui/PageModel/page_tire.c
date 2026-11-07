@@ -105,20 +105,20 @@ bool tire_card_create(tire_card_t *card, lv_obj_t *parent)
     lv_obj_set_pos(area, AREA_X, AREA_Y);
 
     /* 车体底图 + 四张异常高亮图（后者默认隐藏） */
-    card->img_car = tire_image(card->root, UI_IMG("TirePressure/car.bin"),
+    card->img_car = tire_image(card->root, UI_IMG("TirePressure/car.png"),
                                IMG_X, IMG_Y);
 
     card->img_warn[0] = tire_image(card->root,
-                                   UI_IMG("TirePressure/left_front.bin"),
+                                   UI_IMG("TirePressure/left_front.png"),
                                    IMG_X, IMG_Y);
     card->img_warn[1] = tire_image(card->root,
-                                   UI_IMG("TirePressure/right_front.bin"),
+                                   UI_IMG("TirePressure/right_front.png"),
                                    IMG_X, IMG_Y);
     card->img_warn[2] = tire_image(card->root,
-                                   UI_IMG("TirePressure/left_after.bin"),
+                                   UI_IMG("TirePressure/left_after.png"),
                                    IMG_X, IMG_Y);
     card->img_warn[3] = tire_image(card->root,
-                                   UI_IMG("TirePressure/right_after.bin"),
+                                   UI_IMG("TirePressure/right_after.png"),
                                    IMG_X, IMG_Y);
 
     block_create(card, 0U, area, 34, 77);      /* 左前 */

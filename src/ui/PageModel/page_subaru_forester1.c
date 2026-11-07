@@ -126,12 +126,12 @@ typedef struct {
  * 近光灯同时接受 15（正常）与 229（远光辅助故障图），有 229 时优先故障图。
  */
 static const ui_lamp_row_item_t s_top_lamps[] = {
-    {"WarnIcon/auto_lamp.bin",       NULL,                            16U, 0U,   56, 56},
-    {"WarnIcon/width_lemp.bin",      NULL,                            12U, 0U,   56, 56},
-    {"WarnIcon/low_beam.bin",        "WarnIcon/low_beam_faulty.bin",  15U, 229U, 56, 56},
-    {"WarnIcon/high_lamp.bin",       NULL,                             9U, 0U,   56, 56},
-    {"WarnIcon/FrontFogLights.bin",  NULL,                            11U, 0U,   40, 40},
-    {"WarnIcon/rear_fog_lights.bin", NULL,                            10U, 0U,   40, 40},
+    {"WarnIcon/auto_lamp.png",       NULL,                            16U, 0U,   56, 56},
+    {"WarnIcon/width_lemp.png",      NULL,                            12U, 0U,   56, 56},
+    {"WarnIcon/low_beam.png",        "WarnIcon/low_beam_faulty.png",  15U, 229U, 56, 56},
+    {"WarnIcon/high_lamp.png",       NULL,                             9U, 0U,   56, 56},
+    {"WarnIcon/FrontFogLights.png",  NULL,                            11U, 0U,   40, 40},
+    {"WarnIcon/rear_fog_lights.png", NULL,                            10U, 0U,   40, 40},
 };
 
 #define TOP_LAMP_COUNT (uint8_t)(sizeof(s_top_lamps) / sizeof(s_top_lamps[0]))
@@ -145,92 +145,92 @@ static ui_lamp_group_t s_left_lamps;
 
 static const ui_lamp_group_item_t s_left_lamp_items[] = {
     /* 制动液位低（Qt 水平居中 y=226）46×46，码 5 */
-    { .variants = {{"WarnIcon/brake_r.bin", 5U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/brake_r.png", 5U, 0U}}, .variant_count = 1,
       .x = 453, .y = 305, .w = 46, .h = 46 },
 
     /* 电子手刹 (340,226) 46×46，码 23 */
-    { .variants = {{"WarnIcon/park.bin", 23U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/park.png", 23U, 0U}}, .variant_count = 1,
       .x = 506, .y = 305, .w = 46, .h = 46 },
 
     /* 自动驻车 (400,226) 46×46，码 46 / 91 共用一张图 */
-    { .variants = {{"WarnIcon/park_auto.bin", 46U, 91U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/park_auto.png", 46U, 91U}}, .variant_count = 1,
       .x = 566, .y = 305, .w = 46, .h = 46 },
 
     /* 胎压 (234,220) 52×52，码 24 */
-    { .variants = {{"WarnIcon/tire_faulty.bin", 24U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/tire_faulty.png", 24U, 0U}}, .variant_count = 1,
       .x = 400, .y = 299, .w = 52, .h = 52 },
 
     /* 前大灯随动转向 (122,216) 64×64，码 210 */
-    { .variants = {{"WarnIcon/210.bin", 210U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/210.png", 210U, 0U}}, .variant_count = 1,
       .x = 288, .y = 295, .w = 64, .h = 64 },
 
     /* EyeSight 警告/暂停 (176,216) 64×64，码 216 / 228 */
-    { .variants = {{"WarnIcon/216.bin", 216U, 0U},
-                   {"WarnIcon/228.bin", 228U, 0U}},
+    { .variants = {{"WarnIcon/216.png", 216U, 0U},
+                   {"WarnIcon/228.png", 228U, 0U}},
       .variant_count = 2, .x = 342, .y = 295, .w = 64, .h = 64 },
 
     /* 防碰撞关闭/警告 (288,112) 52×52，码 107 / 108 */
-    { .variants = {{"WarnIcon/anti-collision_r.bin", 107U, 0U},
-                   {"WarnIcon/anti-collision.bin", 108U, 0U}},
+    { .variants = {{"WarnIcon/anti-collision_r.png", 107U, 0U},
+                   {"WarnIcon/anti-collision.png", 108U, 0U}},
       .variant_count = 2, .x = 454, .y = 191, .w = 52, .h = 52 },
 
     /* 坡路自动驻车报警 (226,112) 64×64，码 207 */
-    { .variants = {{"WarnIcon/207.bin", 207U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/207.png", 207U, 0U}}, .variant_count = 1,
       .x = 392, .y = 191, .w = 64, .h = 64 },
 
     /* ESC 故障 (180,162) 52×52，码 19 */
-    { .variants = {{"WarnIcon/19.bin", 19U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/19.png", 19U, 0U}}, .variant_count = 1,
       .x = 346, .y = 241, .w = 52, .h = 52 },
 
     /* ESC 关闭 (230,166) 52×52，码 20 */
-    { .variants = {{"WarnIcon/ESCOFF.bin", 20U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/ESCOFF.png", 20U, 0U}}, .variant_count = 1,
       .x = 396, .y = 245, .w = 52, .h = 52 },
 
     /* LAS 车道偏离 (286,166) 52×52，码 49/52 黄、50 灰、51 绿 */
-    { .variants = {{"WarnIcon/LAS-y.bin", 49U, 52U},
-                   {"WarnIcon/LAS-2.bin", 50U, 0U},
-                   {"WarnIcon/LAS-1.bin", 51U, 0U}},
+    { .variants = {{"WarnIcon/LAS-y.png", 49U, 52U},
+                   {"WarnIcon/LAS-2.png", 50U, 0U},
+                   {"WarnIcon/LAS-1.png", 51U, 0U}},
       .variant_count = 3, .x = 452, .y = 245, .w = 52, .h = 52 },
 
     /* 变速箱温度高 (130,270) 64×64，码 8 */
-    { .variants = {{"WarnIcon/8.bin", 8U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/8.png", 8U, 0U}}, .variant_count = 1,
       .x = 296, .y = 349, .w = 64, .h = 64 },
 
     /* 后差速器油温高 (196,270) 64×64，码 204 */
-    { .variants = {{"WarnIcon/204.bin", 204U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/204.png", 204U, 0U}}, .variant_count = 1,
       .x = 362, .y = 349, .w = 64, .h = 64 },
 
     /* 智能模式 (136,340) 52×52，码 232 绿 / 233 黄 / 234 红 */
-    { .variants = {{"WarnIcon/smart_g.bin", 232U, 0U},
-                   {"WarnIcon/smart_y.bin", 233U, 0U},
-                   {"WarnIcon/smart_r.bin", 234U, 0U}},
+    { .variants = {{"WarnIcon/smart_g.png", 232U, 0U},
+                   {"WarnIcon/smart_y.png", 233U, 0U},
+                   {"WarnIcon/smart_r.png", 234U, 0U}},
       .variant_count = 3, .x = 302, .y = 419, .w = 52, .h = 52 },
 
     /* EV 模式 (186,340) 52×52，码 235 */
-    { .variants = {{"WarnIcon/EV.bin", 235U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/EV.png", 235U, 0U}}, .variant_count = 1,
       .x = 352, .y = 419, .w = 52, .h = 52 },
 
     /* AVH 自动车辆保持 (148,384) 64×64，码 220 */
-    { .variants = {{"WarnIcon/220.bin", 220U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/220.png", 220U, 0U}}, .variant_count = 1,
       .x = 314, .y = 463, .w = 64, .h = 64 },
 
     /* 外灯损坏 (188,428) 54×54，码 13 / 14 */
-    { .variants = {{"WarnIcon/outer_faulty.bin", 13U, 0U},
-                   {"WarnIcon/14.bin", 14U, 0U}},
+    { .variants = {{"WarnIcon/outer_faulty.png", 13U, 0U},
+                   {"WarnIcon/14.png", 14U, 0U}},
       .variant_count = 2, .x = 354, .y = 507, .w = 54, .h = 54 },
 
     /* EPS 助力转向（Item 40,480 内）52×52，码 6 */
-    { .variants = {{"WarnIcon/eps_faulty.bin", 6U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/eps_faulty.png", 6U, 0U}}, .variant_count = 1,
       .x = 40, .y = 480, .w = 52, .h = 52 },
 
     /* ABS（Item 40,480 内 y=52）46×46，码 4 */
-    { .variants = {{"WarnIcon/abs.bin", 4U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/abs.png", 4U, 0U}}, .variant_count = 1,
       .x = 40, .y = 532, .w = 46, .h = 46 },
 
     /* 雷达（Item 40,480 内 60,110）52×52，码 59 绿 / 129 黄 / 173 红 */
-    { .variants = {{"WarnIcon/P59_g.bin", 59U, 0U},
-                   {"WarnIcon/P59_y.bin", 129U, 0U},
-                   {"WarnIcon/P59_r.bin", 173U, 0U}},
+    { .variants = {{"WarnIcon/P59_g.png", 59U, 0U},
+                   {"WarnIcon/P59_y.png", 129U, 0U},
+                   {"WarnIcon/P59_r.png", 173U, 0U}},
       .variant_count = 3, .x = 100, .y = 590, .w = 52, .h = 52 },
 };
 
@@ -246,56 +246,56 @@ static ui_lamp_group_t s_right_lamps;
 
 static const ui_lamp_group_item_t s_right_lamp_items[] = {
     /* 机油液位低 (290,216) 64×64，码 206 */
-    { .variants = {{"WarnIcon/oil_y.bin", 206U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/oil_y.png", 206U, 0U}}, .variant_count = 1,
       .x = 1424, .y = 295, .w = 64, .h = 64 },
 
     /* 机油压力 (356,216) 64×64，码 25 */
-    { .variants = {{"WarnIcon/oil.bin", 25U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/oil.png", 25U, 0U}}, .variant_count = 1,
       .x = 1490, .y = 295, .w = 64, .h = 64 },
 
     /* READY 指示灯 (358,266) 64×64，码 139 绿 / 140 红 / 241 白 */
-    { .variants = {{"WarnIcon/READY_g.bin", 139U, 0U},
-                   {"WarnIcon/READY_r.bin", 140U, 0U},
-                   {"WarnIcon/acc_ready.bin", 241U, 0U}},
+    { .variants = {{"WarnIcon/READY_g.png", 139U, 0U},
+                   {"WarnIcon/READY_r.png", 140U, 0U},
+                   {"WarnIcon/acc_ready.png", 241U, 0U}},
       .variant_count = 3, .x = 1492, .y = 345, .w = 64, .h = 64 },
 
     /* 全时四驱 AWD (428,216) 64×64，码 203 */
-    { .variants = {{"WarnIcon/203.bin", 203U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/203.png", 203U, 0U}}, .variant_count = 1,
       .x = 1562, .y = 295, .w = 64, .h = 64 },
 
     /* 四驱故障 (286,180) 52×52，码 36；Qt visible: SettingsMgr.show4h */
-    { .variants = {{"WarnIcon/4WD_l.bin", 36U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/4WD_l.png", 36U, 0U}}, .variant_count = 1,
       .gate = (uint8_t)UI_LAMP_GATE_SHOW_4H,
       .x = 1420, .y = 259, .w = 52, .h = 52 },
 
     /* 四驱打开 (226,180) 52×52，码 33；Qt visible: SettingsMgr.show4h */
-    { .variants = {{"WarnIcon/four_g.bin", 33U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/four_g.png", 33U, 0U}}, .variant_count = 1,
       .gate = (uint8_t)UI_LAMP_GATE_SHOW_4H,
       .x = 1360, .y = 259, .w = 52, .h = 52 },
 
     /* hole 指示灯 (406,180) 52×52，码 238 */
-    { .variants = {{"WarnIcon/hole_w.bin", 238U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/hole_w.png", 238U, 0U}}, .variant_count = 1,
       .x = 1540, .y = 259, .w = 52, .h = 52 },
 
     /* 行人接近警告 (434,333) 52×52，码 236 开启 / 237 关闭 */
-    { .variants = {{"WarnIcon/people_close_g.bin", 236U, 0U},
-                   {"WarnIcon/people_close_r.bin", 237U, 0U}},
+    { .variants = {{"WarnIcon/people_close_g.png", 236U, 0U},
+                   {"WarnIcon/people_close_r.png", 237U, 0U}},
       .variant_count = 2, .x = 1568, .y = 412, .w = 52, .h = 52 },
 
     /* 自动车辆保持工作 (434,273) 52×52，码 222 */
-    { .variants = {{"WarnIcon/222.bin", 222U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/222.png", 222U, 0U}}, .variant_count = 1,
       .x = 1568, .y = 352, .w = 52, .h = 52 },
 
     /* 主驾安全带 (280,442) 42×42，码 17 */
-    { .variants = {{"WarnIcon/belt1.bin", 17U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/belt1.png", 17U, 0U}}, .variant_count = 1,
       .x = 1414, .y = 521, .w = 42, .h = 42 },
 
     /* 副驾安全带 (325,442) 42×42，码 18 */
-    { .variants = {{"WarnIcon/belt2.bin", 18U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/belt2.png", 18U, 0U}}, .variant_count = 1,
       .x = 1459, .y = 521, .w = 42, .h = 42 },
 
     /* 安全气囊 (370,442) 42×42，码 3 */
-    { .variants = {{"WarnIcon/airbag_faulty.bin", 3U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/airbag_faulty.png", 3U, 0U}}, .variant_count = 1,
       .x = 1504, .y = 521, .w = 42, .h = 42 },
 };
 
@@ -307,23 +307,23 @@ static ui_lamp_group_t s_bottom_lamps;
 
 static const ui_lamp_group_item_t s_bottom_lamp_items[] = {
     /* 发动机故障 (0,0) 52×52，码 2 */
-    { .variants = {{"WarnIcon/engine_faulty.bin", 2U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/engine_faulty.png", 2U, 0U}}, .variant_count = 1,
       .x = 660, .y = 630, .w = 52, .h = 52 },
 
     /* 自动启停警告 (64×64 容器内居中) 64×64，码 27 / 219 */
-    { .variants = {{"WarnIcon/217.bin", 27U, 219U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/217.png", 27U, 219U}}, .variant_count = 1,
       .x = 712, .y = 630, .w = 64, .h = 64 },
 
     /* 自动启停未检测到操作，与上一盏完全重叠，码 28 */
-    { .variants = {{"WarnIcon/219.bin", 28U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/219.png", 28U, 0U}}, .variant_count = 1,
       .x = 712, .y = 630, .w = 64, .h = 64 },
 
     /* 智能怠速正在工作 (52×52) ，码 26 */
-    { .variants = {{"WarnIcon/26.bin", 26U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/26.png", 26U, 0U}}, .variant_count = 1,
       .x = 776, .y = 630, .w = 52, .h = 52 },
 
     /* 陡坡缓降 (58×58，行内垂直居中) ，码 30 / 94 */
-    { .variants = {{"WarnIcon/steep_y.bin", 30U, 94U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/steep_y.png", 30U, 94U}}, .variant_count = 1,
       .x = 1052, .y = 633, .w = 58, .h = 58 },
 };
 
@@ -363,17 +363,17 @@ static void tach_gauge_create(lv_obj_t *parent, s1_page_t *ui)
  * 车色 multiply 与右舵镜像依赖设置项，暂未接入（默认白色 = 无效果）。
  */
 static const char *const s_car_lane_paths[CAR_FRAME_COUNT] = {
-    UI_IMG("SubaruForester/CheDao_01.bin"),
-    UI_IMG("SubaruForester/CheDao_02.bin"),
-    UI_IMG("SubaruForester/CheDao_03.bin"),
-    UI_IMG("SubaruForester/CheDao_04.bin"),
+    UI_IMG("SubaruForester/navigation/CheDao_01.png"),
+    UI_IMG("SubaruForester/navigation/CheDao_02.png"),
+    UI_IMG("SubaruForester/navigation/CheDao_03.png"),
+    UI_IMG("SubaruForester/navigation/CheDao_04.png"),
 };
 
 static const char *const s_car_body_paths[CAR_FRAME_COUNT] = {
-    UI_IMG("SubaruForester/lun_01.bin"),
-    UI_IMG("SubaruForester/lun_02.bin"),
-    UI_IMG("SubaruForester/lun_03.bin"),
-    UI_IMG("SubaruForester/lun_04.bin"),
+    UI_IMG("SubaruForester/navigation/lun_01.png"),
+    UI_IMG("SubaruForester/navigation/lun_02.png"),
+    UI_IMG("SubaruForester/navigation/lun_03.png"),
+    UI_IMG("SubaruForester/navigation/lun_04.png"),
 };
 
 /* 只显示指定帧：8 张图一次性创建好，切换时仅改可见性，不重建对象 */
@@ -418,7 +418,7 @@ static void central_card_create(lv_obj_t *parent, s1_page_t *ui)
     }
 
     ui->car_mask = add_image(ui->car_clip,
-                             UI_IMG("SubaruForester/lun_Color_mask.bin"),
+                             UI_IMG("SubaruForester/navigation/lun_Color_mask.png"),
                              -170, -330);
 
     /*
@@ -434,13 +434,13 @@ static void central_card_create(lv_obj_t *parent, s1_page_t *ui)
 
     /* 示宽灯与左右转向灯：同为整图叠加，靠可见性亮灭 */
     ui->car_width_lamp = add_image(ui->car_clip,
-                                   UI_IMG("SubaruForester/Deng_01.bin"),
+                                   UI_IMG("SubaruForester/navigation/Deng_01.png"),
                                    -170, -330);
     ui->car_turn_left = add_image(ui->car_clip,
-                                  UI_IMG("SubaruForester/Deng_02.bin"),
+                                  UI_IMG("SubaruForester/navigation/Deng_02.png"),
                                   -170, -330);
     ui->car_turn_right = add_image(ui->car_clip,
-                                   UI_IMG("SubaruForester/Deng_03.bin"),
+                                   UI_IMG("SubaruForester/navigation/Deng_03.png"),
                                    -170, -330);
 
     lv_obj_add_flag(ui->car_width_lamp, LV_OBJ_FLAG_HIDDEN);
@@ -668,7 +668,7 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
                                          sizeof(s_bottom_lamp_items[0])));
 
     /* ECO 指示：表盘原点 (166,79) + Qt 子项 (350,380)，默认隐藏 */
-    ui->eco_lamp = add_image(page, UI_IMG("WarnIcon/eco.bin"), 516, 459);
+    ui->eco_lamp = add_image(page, UI_IMG("WarnIcon/eco.png"), 516, 459);
     lv_obj_add_flag(ui->eco_lamp, LV_OBJ_FLAG_HIDDEN);
 
     /* 转向灯：Qt IconTurnSignals 位于 (660,98)，宽 600，左右图标各 54x48 */
@@ -676,7 +676,7 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
                                 660, 98, 1206, 98, 54, 48);
 
     /* z=1：中央半透明面板 */
-    add_image(page, UI_IMG("SubaruForester/bg_01.bin"), 568, 150);
+    add_image(page, UI_IMG("SubaruForester/bg_01.png"), 568, 150);
 
     /* z=2：中心卡片容器（Qt StackLayout 553,140,814,509），当前显示车辆视图 */
     ui->central_stack = ui_blank_container(page);
@@ -729,9 +729,9 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
 
     /* 小车门：Qt PageSmallDoor 64×64 位于 (1152,92)，仅在故障码 22 时显示 */
     (void)ui_small_door_create(&ui->mini_door, page, 1152, 92,
-                               UI_IMG("Door/Style1/small_door_bg.bin"),
-                               UI_IMG("Door/Style1/small_door_left_front.bin"),
-                               UI_IMG("Door/Style1/small_door_right_front.bin"));
+                               UI_IMG("Door/Style1/small_door_bg.png"),
+                               UI_IMG("Door/Style1/small_door_left_front.png"),
+                               UI_IMG("Door/Style1/small_door_right_front.png"));
 
     /* z=2：辅助仪表与文字 */
     fuel_forester1_create(&ui->fuel, page, 1589, 295);

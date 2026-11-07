@@ -54,25 +54,25 @@ static const arc_pos_t s_rear_pos[4][3] = {
 };
 
 static const char *const s_front_path[4][3] = {
-    { UI_IMG("Radar/front_0_g.bin"), UI_IMG("Radar/front_0_y.bin"),
-      UI_IMG("Radar/front_0_r.bin") },
-    { UI_IMG("Radar/front_1_g.bin"), UI_IMG("Radar/front_1_y.bin"),
-      UI_IMG("Radar/front_1_r.bin") },
-    { UI_IMG("Radar/front_2_g.bin"), UI_IMG("Radar/front_2_y.bin"),
-      UI_IMG("Radar/front_2_r.bin") },
-    { UI_IMG("Radar/front_3_g.bin"), UI_IMG("Radar/front_3_y.bin"),
-      UI_IMG("Radar/front_3_r.bin") },
+    { UI_IMG("Radar/front_0_g.png"), UI_IMG("Radar/front_0_y.png"),
+      UI_IMG("Radar/front_0_r.png") },
+    { UI_IMG("Radar/front_1_g.png"), UI_IMG("Radar/front_1_y.png"),
+      UI_IMG("Radar/front_1_r.png") },
+    { UI_IMG("Radar/front_2_g.png"), UI_IMG("Radar/front_2_y.png"),
+      UI_IMG("Radar/front_2_r.png") },
+    { UI_IMG("Radar/front_3_g.png"), UI_IMG("Radar/front_3_y.png"),
+      UI_IMG("Radar/front_3_r.png") },
 };
 
 static const char *const s_rear_path[4][3] = {
-    { UI_IMG("Radar/rear_0_g.bin"), UI_IMG("Radar/rear_0_y.bin"),
-      UI_IMG("Radar/rear_0_r.bin") },
-    { UI_IMG("Radar/rear_1_g.bin"), UI_IMG("Radar/rear_1_y.bin"),
-      UI_IMG("Radar/rear_1_r.bin") },
-    { UI_IMG("Radar/rear_2_g.bin"), UI_IMG("Radar/rear_2_y.bin"),
-      UI_IMG("Radar/rear_2_r.bin") },
-    { UI_IMG("Radar/rear_3_g.bin"), UI_IMG("Radar/rear_3_y.bin"),
-      UI_IMG("Radar/rear_3_r.bin") },
+    { UI_IMG("Radar/rear_0_g.png"), UI_IMG("Radar/rear_0_y.png"),
+      UI_IMG("Radar/rear_0_r.png") },
+    { UI_IMG("Radar/rear_1_g.png"), UI_IMG("Radar/rear_1_y.png"),
+      UI_IMG("Radar/rear_1_r.png") },
+    { UI_IMG("Radar/rear_2_g.png"), UI_IMG("Radar/rear_2_y.png"),
+      UI_IMG("Radar/rear_2_r.png") },
+    { UI_IMG("Radar/rear_3_g.png"), UI_IMG("Radar/rear_3_y.png"),
+      UI_IMG("Radar/rear_3_r.png") },
 };
 
 static lv_obj_t *radar_image(lv_obj_t *parent, const char *path,
@@ -103,11 +103,11 @@ bool ov_radar_create(ov_radar_t *ov, lv_obj_t *parent)
     lv_obj_set_pos(ov->root, RADAR_X, RADAR_Y);
 
     bg = lv_image_create(ov->root);
-    lv_image_set_src(bg, UI_IMG("Radar/radar_bg.bin"));
+    lv_image_set_src(bg, UI_IMG("Radar/radar_bg.png"));
     lv_obj_set_pos(bg, 0, 0);
 
     /* 前雷达波 + 前弧 */
-    ov->wave_front = radar_image(ov->root, UI_IMG("Radar/wave_front.bin"),
+    ov->wave_front = radar_image(ov->root, UI_IMG("Radar/wave_front.png"),
                                  WAVE_FRONT_X, WAVE_FRONT_Y);
     for(i = 0U; i < 4U; ++i) {
         for(c = 0U; c < 3U; ++c) {
@@ -119,11 +119,11 @@ bool ov_radar_create(ov_radar_t *ov, lv_obj_t *parent)
 
     /* 小车 */
     car = lv_image_create(ov->root);
-    lv_image_set_src(car, UI_IMG("Radar/car.bin"));
+    lv_image_set_src(car, UI_IMG("Radar/car.png"));
     lv_obj_set_pos(car, CAR_X, CAR_Y);
 
     /* 后雷达波 + 后弧（在 Qt 中后弧叠在小车之上） */
-    ov->wave_rear = radar_image(ov->root, UI_IMG("Radar/wave_rear.bin"),
+    ov->wave_rear = radar_image(ov->root, UI_IMG("Radar/wave_rear.png"),
                                 WAVE_REAR_X, WAVE_REAR_Y);
     for(i = 0U; i < 4U; ++i) {
         for(c = 0U; c < 3U; ++c) {

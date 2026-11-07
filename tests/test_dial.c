@@ -29,7 +29,7 @@ static void create_dial(ui_dial_t *dial, int32_t angle)
         .data = pixel,
     };
     ui_dial_create(dial, lv_screen_active(), 0, 0, 620,
-                   "SubaruForester/speed_bg1.bin", &needle, 0, 0, 0, 0, angle);
+                   "SubaruForester/speed_bg1.png", &needle, 0, 0, 0, 0, angle);
 }
 
 static void test_same_target(void)

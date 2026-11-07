@@ -55,14 +55,14 @@
 
 /* 三种模式：0 Android Auto / 1 CarPlay / 2 HiCar */
 static const char *const s_icon_path[MODE_COUNT] = {
-    "WarnIcon/android-auto.bin",
-    "WarnIcon/carplay_fill.bin",
-    "WarnIcon/HiCar.bin",
+    "WarnIcon/android-auto.png",
+    "WarnIcon/carplay_fill.png",
+    "WarnIcon/HiCar.png",
 };
 static const char *const s_preview_path[MODE_COUNT] = {
-    "WarnIcon/AA.bin",
-    "WarnIcon/carplay.bin",
-    "WarnIcon/HC.bin",
+    "WarnIcon/AA.png",
+    "WarnIcon/carplay.png",
+    "WarnIcon/HC.png",
 };
 static const char *const s_mode_name[MODE_COUNT] = {
     "Android Auto",
@@ -203,7 +203,7 @@ static void waiting_create(connect_card_t *card, lv_obj_t *body)
                           LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(row, 10, 0);
 
-    (void)ui_assets_load_image(&s_bt_dsc, "WarnIcon/bluetooth.bin");
+    (void)ui_assets_load_image(&s_bt_dsc, "WarnIcon/bluetooth.png");
 
     {
         lv_obj_t *bt_icon = lv_image_create(row);

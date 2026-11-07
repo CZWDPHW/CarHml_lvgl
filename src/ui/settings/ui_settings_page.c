@@ -66,11 +66,11 @@ typedef struct {
 
 /* 分类图标：[0] 普通，[1] 选中（Qt *_img0 蓝色版） */
 static const char *const s_root_icons[UI_SETTINGS_ROOT_COUNT][2] = {
-    {UI_IMG("settings/menu_itineray.bin"), UI_IMG("settings/menu_itineray0.bin")},
-    {UI_IMG("settings/menu_infromation.bin"), UI_IMG("settings/menu_infromation0.bin")},
-    {UI_IMG("settings/menu_mycar.bin"), UI_IMG("settings/menu_mycar0.bin")},
-    {UI_IMG("settings/menu_setting.bin"), UI_IMG("settings/menu_setting0.bin")},
-    {UI_IMG("settings/connect.bin"), UI_IMG("settings/connect0.bin")},
+    {UI_IMG("settings/menu_itineray.png"), UI_IMG("settings/menu_itineray0.png")},
+    {UI_IMG("settings/menu_infromation.png"), UI_IMG("settings/menu_infromation0.png")},
+    {UI_IMG("settings/menu_mycar.png"), UI_IMG("settings/menu_mycar0.png")},
+    {UI_IMG("settings/menu_setting.png"), UI_IMG("settings/menu_setting0.png")},
+    {UI_IMG("settings/connect.png"), UI_IMG("settings/connect0.png")},
 };
 
 static const char *const s_root_names[UI_SETTINGS_ROOT_COUNT] = {

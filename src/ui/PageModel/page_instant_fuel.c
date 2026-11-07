@@ -67,7 +67,7 @@ bool instant_fuel_card_create(instant_fuel_card_t *card, lv_obj_t *parent)
 
     /* 图标先建、文本后建：与 Qt 声明顺序一致，文本压在图上 */
     card->icon = lv_image_create(body);
-    lv_image_set_src(card->icon, UI_IMG("material2/MenuItem/instant_fuel.bin"));
+    lv_image_set_src(card->icon, UI_IMG("material2/MenuItem/instant_fuel.png"));
     lv_obj_set_pos(card->icon, ICON_X, ICON_Y);
 
     card->value = lv_label_create(body);

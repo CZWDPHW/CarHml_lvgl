@@ -17,12 +17,8 @@ extern "C" {
 /* Qt 的 Page 统一 scale: 0.975，LVGL 用 250/256 ≈ 0.9766 近似 */
 #define UI_PAGE_SCALE 250
 
-/* 资源根：PC 用 bin32；上板时切换为 bin16 */
-#if defined(CARMW_PLATFORM_BOARD)
-#define UI_ASSET_ROOT "A:/bin16/"
-#else
-#define UI_ASSET_ROOT "A:/bin32/"
-#endif
+/* PNG 源图由 LVGL 内置解码器按需读取 */
+#define UI_ASSET_ROOT "A:/src/"
 #define UI_IMG(path) UI_ASSET_ROOT path
 
 /*

@@ -144,20 +144,20 @@ bool chassis_card_create(chassis_card_t *card, lv_obj_t *parent)
     lv_obj_add_flag(card->angle_label, LV_OBJ_FLAG_HIDDEN);
 
     /* 图层顺序与 Qt 一致：车模 → 升降背景 → 四轮驱动指示 */
-    lv_obj_t *img_car = card_image(card->root, UI_IMG("OffRoad/off_road_car.bin"),
+    lv_obj_t *img_car = card_image(card->root, UI_IMG("OffRoad/off_road_car.png"),
                                    CAR_X, CAR_Y);
     (void)img_car;
 
-    card->img_bg = card_image(card->root, UI_IMG("OffRoad/drive_bg_blue.bin"),
+    card->img_bg = card_image(card->root, UI_IMG("OffRoad/drive_bg_blue.png"),
                               CAR_X, CAR_Y);
 
-    card->img_wheel[0] = card_image(card->root, UI_IMG("OffRoad/2h_z.bin"),
+    card->img_wheel[0] = card_image(card->root, UI_IMG("OffRoad/2h_z.png"),
                                     CAR_X, CAR_Y);
-    card->img_wheel[1] = card_image(card->root, UI_IMG("OffRoad/2h_y.bin"),
+    card->img_wheel[1] = card_image(card->root, UI_IMG("OffRoad/2h_y.png"),
                                     CAR_X, CAR_Y);
-    card->img_wheel[2] = card_image(card->root, UI_IMG("OffRoad/after_2h_z.bin"),
+    card->img_wheel[2] = card_image(card->root, UI_IMG("OffRoad/after_2h_z.png"),
                                     CAR_X, CAR_Y);
-    card->img_wheel[3] = card_image(card->root, UI_IMG("OffRoad/after_2h_y.bin"),
+    card->img_wheel[3] = card_image(card->root, UI_IMG("OffRoad/after_2h_y.png"),
                                     CAR_X, CAR_Y);
 
     card->traj_left = traj_create(card->root);

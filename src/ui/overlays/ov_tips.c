@@ -59,35 +59,35 @@ typedef struct {
 
 /* 图标映射与 Qt GeneralTipsWindow 的 switch 一致，未列出的 id 用默认红三角 */
 static const tip_icon_t s_icons[] = {
-    {1U,  UI_IMG("WarnIcon/tips/icon_1.bin")},
-    {2U,  UI_IMG("WarnIcon/tips/icon_2.bin")},
-    {3U,  UI_IMG("WarnIcon/tips/icon_3.bin")},
-    {4U,  UI_IMG("WarnIcon/tips/icon_4.bin")},
-    {5U,  UI_IMG("WarnIcon/tips/icon_5.bin")},
-    {7U,  UI_IMG("WarnIcon/tips/icon_2.bin")},
-    {8U,  UI_IMG("WarnIcon/tips/icon_2.bin")},
-    {9U,  UI_IMG("WarnIcon/tips/icon_9.bin")},
-    {10U, UI_IMG("WarnIcon/tips/icon_2.bin")},
-    {12U, UI_IMG("WarnIcon/tips/icon_4.bin")},
-    {13U, UI_IMG("WarnIcon/tips/icon_13.bin")},
-    {14U, UI_IMG("WarnIcon/tips/icon_13.bin")},
-    {15U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {16U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {17U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {18U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {19U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {20U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {21U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {22U, UI_IMG("WarnIcon/tips/icon_15.bin")},
-    {23U, UI_IMG("WarnIcon/tips/icon_23.bin")},
-    {24U, UI_IMG("WarnIcon/tips/icon_24.bin")},
-    {25U, UI_IMG("WarnIcon/tips/icon_25.bin")},
-    {26U, UI_IMG("WarnIcon/tips/icon_26.bin")},
-    {27U, UI_IMG("WarnIcon/tips/icon_27.bin")},
-    {28U, UI_IMG("WarnIcon/tips/icon_28.bin")},
-    {29U, UI_IMG("WarnIcon/tips/icon_29.bin")},
-    {30U, UI_IMG("WarnIcon/tips/icon_3.bin")},
-    {39U, UI_IMG("WarnIcon/tips/icon_39.bin")},
+    {1U,  UI_IMG("WarnIcon/tips/icon_1.png")},
+    {2U,  UI_IMG("WarnIcon/tips/icon_2.png")},
+    {3U,  UI_IMG("WarnIcon/tips/icon_3.png")},
+    {4U,  UI_IMG("WarnIcon/tips/icon_4.png")},
+    {5U,  UI_IMG("WarnIcon/tips/icon_5.png")},
+    {7U,  UI_IMG("WarnIcon/tips/icon_2.png")},
+    {8U,  UI_IMG("WarnIcon/tips/icon_2.png")},
+    {9U,  UI_IMG("WarnIcon/tips/icon_9.png")},
+    {10U, UI_IMG("WarnIcon/tips/icon_2.png")},
+    {12U, UI_IMG("WarnIcon/tips/icon_4.png")},
+    {13U, UI_IMG("WarnIcon/tips/icon_13.png")},
+    {14U, UI_IMG("WarnIcon/tips/icon_13.png")},
+    {15U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {16U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {17U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {18U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {19U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {20U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {21U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {22U, UI_IMG("WarnIcon/tips/icon_15.png")},
+    {23U, UI_IMG("WarnIcon/tips/icon_23.png")},
+    {24U, UI_IMG("WarnIcon/tips/icon_24.png")},
+    {25U, UI_IMG("WarnIcon/tips/icon_25.png")},
+    {26U, UI_IMG("WarnIcon/tips/icon_26.png")},
+    {27U, UI_IMG("WarnIcon/tips/icon_27.png")},
+    {28U, UI_IMG("WarnIcon/tips/icon_28.png")},
+    {29U, UI_IMG("WarnIcon/tips/icon_29.png")},
+    {30U, UI_IMG("WarnIcon/tips/icon_3.png")},
+    {39U, UI_IMG("WarnIcon/tips/icon_39.png")},
 };
 
 typedef struct {
@@ -193,7 +193,7 @@ static const char *tip_icon_path(uint32_t id)
         }
     }
 
-    return UI_IMG("WarnIcon/tips/icon_1.bin");
+    return UI_IMG("WarnIcon/tips/icon_1.png");
 }
 
 static const char *tip_text(uint32_t id)
@@ -276,7 +276,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     ov->fuel_banner = tips_box(ov->root, FUEL_X, FUEL_Y, FUEL_W, FUEL_H, 1U);
     {
         lv_obj_t *icon = lv_image_create(ov->fuel_banner);
-        lv_image_set_src(icon, UI_IMG("WarnIcon/tips/fuel_low_42.bin"));
+        lv_image_set_src(icon, UI_IMG("WarnIcon/tips/fuel_low_42.png"));
         lv_obj_align(icon, LV_ALIGN_LEFT_MID, 10, 0);
     }
     {
@@ -296,7 +296,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
         ov->gear_banner = tips_box(ov->root, 0, FUEL_Y, 400, GEAR_H, 1U);
         {
             lv_obj_t *icon = lv_image_create(ov->gear_banner);
-            lv_image_set_src(icon, UI_IMG("WarnIcon/tips/red_warning_42.bin"));
+            lv_image_set_src(icon, UI_IMG("WarnIcon/tips/red_warning_42.png"));
             lv_obj_align(icon, LV_ALIGN_LEFT_MID, 10, 0);
         }
         {
@@ -321,7 +321,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
 
     {
         lv_obj_t *bg = lv_image_create(ov->general);
-        lv_image_set_src(bg, UI_IMG("WarnIcon/tips/tips_bg_260.bin"));
+        lv_image_set_src(bg, UI_IMG("WarnIcon/tips/tips_bg_260.png"));
         lv_obj_set_pos(bg, 0, 0);
 
         lv_obj_t *mask = lv_obj_create(ov->general);
@@ -335,7 +335,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     }
 
     ov->gen_title_icon = lv_image_create(ov->general);
-    lv_image_set_src(ov->gen_title_icon, UI_IMG("WarnIcon/tips/red_warning_28.bin"));
+    lv_image_set_src(ov->gen_title_icon, UI_IMG("WarnIcon/tips/red_warning_28.png"));
     lv_obj_set_pos(ov->gen_title_icon, GEN_PAD + 20, GEN_TITLE_Y);
 
     ov->gen_title = tips_label(ov->general, "WARNING",

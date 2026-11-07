@@ -22,8 +22,8 @@ bool ui_turn_signal_create(ui_turn_signal_t *signal, lv_obj_t *parent,
     signal->blinking = false;
     signal->blink_tick = 0U;
 
-    if(!ui_assets_load_image(&signal->left_dsc, "WarnIcon/left_lamp.bin") ||
-       !ui_assets_load_image(&signal->right_dsc, "WarnIcon/right_lamp.bin")) {
+    if(!ui_assets_load_image(&signal->left_dsc, "WarnIcon/left_lamp.png") ||
+       !ui_assets_load_image(&signal->right_dsc, "WarnIcon/right_lamp.png")) {
         return false;
     }
 

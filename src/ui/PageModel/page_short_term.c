@@ -100,7 +100,7 @@ bool short_term_card_create(short_term_card_t *card, lv_obj_t *parent)
     lv_obj_set_pos(body, BODY_X, BODY_Y);
 
     icon = lv_image_create(body);
-    lv_image_set_src(icon, UI_IMG("material2/MenuItem/short_term.bin"));
+    lv_image_set_src(icon, UI_IMG("material2/MenuItem/short_term.png"));
     lv_obj_set_pos(icon, ICON_X, ICON_Y);
 
     column = ui_blank_container(body);

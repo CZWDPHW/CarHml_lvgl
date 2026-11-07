@@ -43,20 +43,20 @@ typedef struct {
 } nav_sprite_t;
 
 static const nav_sprite_t s_layers[] = {
-    { UI_IMG("CruiseNav/lane.bin"),       POS_LANE_X,       POS_LANE_Y },
-    { UI_IMG("CruiseNav/left_area.bin"),  POS_LEFT_AREA_X,  POS_LEFT_AREA_Y },
-    { UI_IMG("CruiseNav/right_area.bin"), POS_RIGHT_AREA_X, POS_RIGHT_AREA_Y },
-    { UI_IMG("CruiseNav/front_car.bin"),  POS_FRONT_CAR_X,  POS_FRONT_CAR_Y },
-    { UI_IMG("CruiseNav/dist1.bin"),      POS_DIST_X,       169 },
-    { UI_IMG("CruiseNav/dist2.bin"),      POS_DIST_X + 12,  156 },
-    { UI_IMG("CruiseNav/dist3.bin"),      POS_DIST_X + 25,  145 },
-    { UI_IMG("CruiseNav/dist4.bin"),      POS_DIST_X + 34,  135 },
-    { UI_IMG("CruiseNav/lane_left.bin"),  POS_LANE_X,       POS_LANE_Y },
-    { UI_IMG("CruiseNav/lane_right.bin"), POS_LANE_X,       POS_LANE_Y },
-    { UI_IMG("CruiseNav/off_left.bin"),   POS_OFF_LEFT_X,   POS_OFF_Y },
-    { UI_IMG("CruiseNav/off_right.bin"),  POS_OFF_RIGHT_X,  POS_OFF_Y },
-    { UI_IMG("CruiseNav/min_car.bin"),    POS_MIN_CAR_X,    33 },
-    { UI_IMG("CruiseNav/max_car.bin"),    POS_MAX_CAR_X,    POS_MAX_CAR_Y },
+    { UI_IMG("CruiseNav/lane.png"),       POS_LANE_X,       POS_LANE_Y },
+    { UI_IMG("CruiseNav/left_area.png"),  POS_LEFT_AREA_X,  POS_LEFT_AREA_Y },
+    { UI_IMG("CruiseNav/right_area.png"), POS_RIGHT_AREA_X, POS_RIGHT_AREA_Y },
+    { UI_IMG("CruiseNav/front_car.png"),  POS_FRONT_CAR_X,  POS_FRONT_CAR_Y },
+    { UI_IMG("CruiseNav/dist1.png"),      POS_DIST_X,       169 },
+    { UI_IMG("CruiseNav/dist2.png"),      POS_DIST_X + 12,  156 },
+    { UI_IMG("CruiseNav/dist3.png"),      POS_DIST_X + 25,  145 },
+    { UI_IMG("CruiseNav/dist4.png"),      POS_DIST_X + 34,  135 },
+    { UI_IMG("CruiseNav/lane_left.png"),  POS_LANE_X,       POS_LANE_Y },
+    { UI_IMG("CruiseNav/lane_right.png"), POS_LANE_X,       POS_LANE_Y },
+    { UI_IMG("CruiseNav/off_left.png"),   POS_OFF_LEFT_X,   POS_OFF_Y },
+    { UI_IMG("CruiseNav/off_right.png"),  POS_OFF_RIGHT_X,  POS_OFF_Y },
+    { UI_IMG("CruiseNav/min_car.png"),    POS_MIN_CAR_X,    33 },
+    { UI_IMG("CruiseNav/max_car.png"),    POS_MAX_CAR_X,    POS_MAX_CAR_Y },
 };
 
 /* 跟车小车的 y（相对根），索引 = distanceShow 0..4；Qt Style1 分支 */

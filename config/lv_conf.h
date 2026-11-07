@@ -24,8 +24,9 @@
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 #define LV_LOG_PRINTF 1
 
-/* ---------------- 文件系统：读取 assets 下的 .bin 图片 ---------------- */
+/* ---------------- 文件系统：读取 assets 下的 PNG 图片 ---------------- */
 #define LV_USE_FS_STDIO 1
+#define LV_USE_LODEPNG 1
 #define LV_FS_STDIO_LETTER 'A'
 #define LV_FS_STDIO_PATH "./assets"
 #define LV_FS_STDIO_CACHE_SIZE 0

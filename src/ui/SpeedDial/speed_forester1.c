@@ -112,12 +112,12 @@ bool speed_forester1_create(speed_forester1_t *speed, lv_obj_t *parent,
     speed->shown_mile = false;
     speed->shown_valid = false;
 
-    if(!ui_assets_load_image(&s_needle, "SubaruForester/speed_point1.bin")) {
+    if(!ui_assets_load_image(&s_needle, "SubaruForester/speed_point1.png")) {
         return false;
     }
 
     ui_dial_create(&speed->dial, parent, x, y, SPEED_F1_SIZE,
-                   "SubaruForester/speed_bg1.bin", &s_needle,
+                   "SubaruForester/speed_bg1.png", &s_needle,
                    NEEDLE_X, NEEDLE_Y, NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, -1950);
 
     speed->unit = ui_dial_add_text(&speed->dial, "km/h", 290, 350, UI_FONT_SM);

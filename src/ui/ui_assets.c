@@ -7,9 +7,12 @@
 #include "ui/ui_assets.h"
 
 #include <stdio.h>
-// #include <string.h>
+#include <string.h>
+
+#include "lvgl.h"
 
 #include "ui/ui_common.h"
+#include "../../third_party/lvgl/src/draw/lv_image_decoder_private.h"
 
 /* 路径缓冲区长度：资源根 + LVGL 相对逻辑路径 */
 #define ASSET_PATH_MAX 160
@@ -37,70 +40,39 @@ const char *ui_assets_path(const char *rel)
     return s_path;
 }
 
-/*
- * 文件格式为 lv_image_header_t 头 + 像素数据。
- * LV_BIN_DECODER_RAM_LOAD=0 时 LVGL 是逐行流式解码，
- * 变换绘制拿不到整图，因此这里把数据整体读入并交给 lv_image_dsc_t。
- */
 bool ui_assets_load_image(lv_image_dsc_t *dsc, const char *rel)
 {
-    lv_fs_file_t f;
-    uint32_t size = 0;
-    uint32_t rn = 0;
-    uint32_t data_size;
+    lv_image_decoder_dsc_t decoder = {0};
     uint8_t *data;
+    lv_image_header_t header;
+    uint32_t data_size;
     const char *path;
 
     if(dsc == NULL) {
         return false;
     }
-
-    /* 已加载过（跨样式切换复用），直接返回 */
     if(dsc->data != NULL) {
         return true;
     }
 
     path = ui_assets_path(rel);
-    if(path == NULL) {
+    if(path == NULL || lv_image_decoder_open(&decoder, path, NULL) != LV_RESULT_OK) {
         return false;
     }
 
-    if(lv_fs_open(&f, path, LV_FS_MODE_RD) != LV_FS_RES_OK) {
-        return false;
-    }
-
-    if(lv_fs_seek(&f, 0, LV_FS_SEEK_END) != LV_FS_RES_OK ||
-       lv_fs_tell(&f, &size) != LV_FS_RES_OK ||
-       size <= sizeof(lv_image_header_t)) {
-        lv_fs_close(&f);
-        return false;
-    }
-
-    if(lv_fs_seek(&f, 0, LV_FS_SEEK_SET) != LV_FS_RES_OK) {
-        lv_fs_close(&f);
-        return false;
-    }
-
-    lv_fs_read(&f, &dsc->header, sizeof(lv_image_header_t), &rn);
-
-    data_size = size - (uint32_t)sizeof(lv_image_header_t);
+    header = decoder.decoded->header;
+    data_size = decoder.decoded->data_size;
     data = lv_malloc(data_size);
+    if(data != NULL) memcpy(data, decoder.decoded->data, data_size);
+    lv_image_decoder_close(&decoder);
+    if(data == NULL) return false;
 
-    if(data == NULL) {
-        lv_fs_close(&f);
-        return false;
-    }
-
-    lv_fs_read(&f, data, data_size, &rn);
-    lv_fs_close(&f);
-
-    if(rn != data_size) {
-        lv_free(data);
-        return false;
-    }
-
+    dsc->header = header;
     dsc->data_size = data_size;
     dsc->data = data;
-
+    dsc->reserved = NULL;
+    dsc->reserved_2 = NULL;
+    dsc->header.flags = 0;
+    dsc->header.magic = LV_IMAGE_HEADER_MAGIC;
     return true;
 }

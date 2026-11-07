@@ -60,12 +60,12 @@ bool rotate_forester1_create(rotate_forester1_t *rotate, lv_obj_t *parent,
 
     rotate->highlight = -1;
 
-    if(!ui_assets_load_image(&s_needle, "SubaruForester/rotate_point1.bin")) {
+    if(!ui_assets_load_image(&s_needle, "SubaruForester/rotate_point1.png")) {
         return false;
     }
 
     ui_dial_create(&rotate->dial, parent, x, y, ROTATE_F1_SIZE,
-                   "SubaruForester/rotate1_bg.bin", &s_needle,
+                   "SubaruForester/rotate1_bg.png", &s_needle,
                    NEEDLE_X, NEEDLE_Y, NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, 1800);
 
     ui_dial_add_text(&rotate->dial, "x1000/min", 270, 350, UI_FONT_SM);

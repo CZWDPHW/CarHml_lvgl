@@ -165,7 +165,7 @@ static void circular_create(eco_card_t *card, lv_obj_t *body)
     lv_obj_align(center_col, LV_ALIGN_CENTER, 0, 0);
 
     icon = lv_image_create(center_col);
-    lv_image_set_src(icon, UI_IMG("WarnIcon/244.bin"));
+    lv_image_set_src(icon, UI_IMG("WarnIcon/244.png"));
 
     row = ui_blank_container(center_col);
     lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -259,7 +259,7 @@ static void horizontal_create(eco_card_t *card, lv_obj_t *body)
     lv_obj_set_style_bg_opa(card->bar, LV_OPA_COVER, 0);
 
     /* 指针：原图 135×154，整图入 RAM 后按 28×28 等比缩放 */
-    (void)ui_assets_load_image(&s_point_dsc, "SubaruForester/point.bin");
+    (void)ui_assets_load_image(&s_point_dsc, "SubaruForester/point.png");
     card->pointer = lv_image_create(gauge);
     lv_image_set_src(card->pointer, &s_point_dsc);
     lv_obj_set_size(card->pointer, 28, 28);

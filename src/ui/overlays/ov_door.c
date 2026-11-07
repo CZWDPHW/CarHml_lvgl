@@ -45,13 +45,13 @@ bool ov_door_create(ov_door_t *ov, lv_obj_t *parent)
     lv_obj_set_pos(ov->root, DOOR_X, DOOR_Y);
 
     /* 图层顺序与 Qt 声明顺序一致：底图 → 前盖 → 左前 → 左后 → 右前 → 右后 → 后备箱 */
-    ov->bg = door_image(ov->root, UI_IMG("Door/Style2/ov_bg.bin"));
-    ov->hood = door_image(ov->root, UI_IMG("Door/Style2/ov_front.bin"));
-    ov->left_front = door_image(ov->root, UI_IMG("Door/Style2/ov_left_front.bin"));
-    ov->left_rear = door_image(ov->root, UI_IMG("Door/Style2/ov_left_after.bin"));
-    ov->right_front = door_image(ov->root, UI_IMG("Door/Style2/ov_right_front.bin"));
-    ov->right_rear = door_image(ov->root, UI_IMG("Door/Style2/ov_right_after.bin"));
-    ov->trunk = door_image(ov->root, UI_IMG("Door/Style2/ov_after.bin"));
+    ov->bg = door_image(ov->root, UI_IMG("Door/Style2/ov_bg.png"));
+    ov->hood = door_image(ov->root, UI_IMG("Door/Style2/ov_front.png"));
+    ov->left_front = door_image(ov->root, UI_IMG("Door/Style2/ov_left_front.png"));
+    ov->left_rear = door_image(ov->root, UI_IMG("Door/Style2/ov_left_after.png"));
+    ov->right_front = door_image(ov->root, UI_IMG("Door/Style2/ov_right_front.png"));
+    ov->right_rear = door_image(ov->root, UI_IMG("Door/Style2/ov_right_after.png"));
+    ov->trunk = door_image(ov->root, UI_IMG("Door/Style2/ov_after.png"));
 
     lv_obj_add_flag(ov->hood, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(ov->left_front, LV_OBJ_FLAG_HIDDEN);

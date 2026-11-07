@@ -32,11 +32,11 @@ static const cruise_code_icon_t s_code_icons[] = {
 };
 
 static const char *const s_icon_paths[UI_CRUISE_ICON_COUNT] = {
-    "WarnIcon/fixed_speed_green.bin",
-    "WarnIcon/acc_green.bin",
-    "WarnIcon/acc_white.bin",
-    "WarnIcon/fixed_speed_white.bin",
-    "WarnIcon/acc_ready.bin",
+    "WarnIcon/fixed_speed_green.png",
+    "WarnIcon/acc_green.png",
+    "WarnIcon/acc_white.png",
+    "WarnIcon/fixed_speed_white.png",
+    "WarnIcon/acc_ready.png",
 };
 
 /* 切到指定图标；已加载过直接复用，加载失败保持上一张 */

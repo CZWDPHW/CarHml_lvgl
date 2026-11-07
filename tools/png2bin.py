@@ -1,21 +1,6 @@
 #!/usr/bin/env python3
 """
-png2bin.py - 把 PNG 批量转成 LVGL bin 图片
-
-为什么要转：LVGL 运行期解码 PNG 需要额外的解码器依赖，且大图每帧解码
-在板端 CPU 上不现实。bin 是预解码的原始像素，运行期零解码开销。
-
-输出两种格式：
-  bin32/  ARGB8888，PC 模拟器（LV_COLOR_DEPTH=32）使用
-  bin16/  RGB565A8，板端 framebuffer（LV_COLOR_DEPTH=16）使用，保留透明
-
-文件布局 = lv_image_header_t(16B) + 像素数据，与 LVGL 9.5 bin 解码器一致：
-  magic(8) cf(8) flags(16) w(16) h(16) stride(16) reserved(16)
-
-用法：
-  python3 tools/png2bin.py                  # 增量：只转 PNG 比 bin 新的
-  python3 tools/png2bin.py --force          # 全部重转
-  python3 tools/png2bin.py --only SubaruForester
+png2bin.py - 历史资源转换工具，当前运行时直接读取 assets/src 下的 PNG。
 """
 import argparse
 import os

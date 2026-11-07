@@ -131,11 +131,11 @@ static void fm_create(music_card_t *card, lv_obj_t *body)
     lv_obj_set_size(freq_box, 260, 80);
 
     // freq_img = lv_image_create(freq_box);
-    // lv_image_set_src(freq_img, UI_IMG("Audi/media.bin"));
+    // lv_image_set_src(freq_img, UI_IMG("Audi/media.png"));
     // lv_obj_set_size(freq_img, 260, 80);
     // lv_image_set_inner_align(freq_img, LV_IMAGE_ALIGN_CONTAIN);
     freq_img = lv_image_create(freq_box);
-    (void)ui_assets_load_image(&s_media_dsc, "Audi/media.bin");
+    (void)ui_assets_load_image(&s_media_dsc, "Audi/media.png");
     lv_image_set_src(freq_img, &s_media_dsc);
     lv_obj_set_size(freq_img, 260, 80);
     lv_image_set_inner_align(freq_img, LV_IMAGE_ALIGN_CONTAIN);
@@ -156,7 +156,7 @@ static void phone_create(music_card_t *card)
     lv_obj_align(card->phone, LV_ALIGN_BOTTOM_MID, 0, -PHONE_ROOT_OFFSET);
 
     icon = lv_image_create(card->phone);
-    (void)ui_assets_load_image(&s_call_dsc, "Audi/call.bin");
+    (void)ui_assets_load_image(&s_call_dsc, "Audi/call.png");
     lv_image_set_src(icon, &s_call_dsc);
     lv_obj_set_size(icon, 120, 120);
     lv_image_set_inner_align(icon, LV_IMAGE_ALIGN_CONTAIN);

@@ -69,15 +69,15 @@ static void rows_create(itinerary_card_t *card, lv_obj_t *content)
     lv_obj_t *column = ui_blank_container(content);
 
     (void)ui_info_row_create(&card->row_time,
-                             column, UI_IMG("material2/MenuItem/clock.bin"),
+                             column, UI_IMG("material2/MenuItem/clock.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
                              &lv_font_montserrat_28);
     (void)ui_info_row_create(&card->row_distance,
-                             column, UI_IMG("material2/MenuItem/kilometer.bin"),
+                             column, UI_IMG("material2/MenuItem/kilometer.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
                              &lv_font_montserrat_28);
     (void)ui_info_row_create(&card->row_speed,
-                             column, UI_IMG("material2/MenuItem/gauge.bin"),
+                             column, UI_IMG("material2/MenuItem/gauge.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
                              &lv_font_montserrat_28);
 

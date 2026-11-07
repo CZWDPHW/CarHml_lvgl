@@ -599,20 +599,20 @@ static void test_overlay_composition(void)
 
 /* C3-1：25/4 独立灯位 + 共用图标码 46/91 + 同档多图优先级（Qt 表序靠前者优先） */
 static const ui_lamp_group_item_t s_c3_group_items[] = {
-    { .variants = {{"WarnIcon/oil.bin", 25U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/oil.png", 25U, 0U}}, .variant_count = 1,
       .x = 0, .y = 0, .w = 64, .h = 64 },
-    { .variants = {{"WarnIcon/abs.bin", 4U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/abs.png", 4U, 0U}}, .variant_count = 1,
       .x = 70, .y = 0, .w = 46, .h = 46 },
-    { .variants = {{"WarnIcon/park_auto.bin", 46U, 91U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/park_auto.png", 46U, 91U}}, .variant_count = 1,
       .x = 130, .y = 0, .w = 46, .h = 46 },
-    { .variants = {{"WarnIcon/READY_g.bin", 139U, 0U},
-                   {"WarnIcon/READY_r.bin", 140U, 0U}},
+    { .variants = {{"WarnIcon/READY_g.png", 139U, 0U},
+                   {"WarnIcon/READY_r.png", 140U, 0U}},
       .variant_count = 2, .x = 190, .y = 0, .w = 64, .h = 64 },
 };
 
 /* C3-1：主码 15 常亮 / 备码 229 故障图；备码非零时优先生效 */
 static const ui_lamp_row_item_t s_c3_row_items[] = {
-    {"WarnIcon/low_beam.bin", "WarnIcon/low_beam_faulty.bin", 15U, 229U, 56, 56},
+    {"WarnIcon/low_beam.png", "WarnIcon/low_beam_faulty.png", 15U, 229U, 56, 56},
 };
 
 static void check_group_state(ui_lamp_group_t *group, uint8_t index,
@@ -793,7 +793,7 @@ static void test_lamp_states(lv_obj_t *screen)
 
 /* Qt show4h 门控的灯位（码 33 四驱打开 / 36 四驱故障） */
 static const ui_lamp_group_item_t s_4h_gate_items[] = {
-    { .variants = {{"WarnIcon/four_g.bin", 33U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/four_g.png", 33U, 0U}}, .variant_count = 1,
       .x = 0, .y = 0, .w = 64, .h = 64, .gate = UI_LAMP_GATE_SHOW_4H },
 };
 
@@ -823,9 +823,9 @@ static void test_lamp_4h_gate(lv_obj_t *screen)
 
 /* 快闪 600ms / 慢闪 6000ms：虚拟时钟推进，重复 apply 不得重置相位 */
 static const ui_lamp_group_item_t s_c3_blink_items[] = {
-    { .variants = {{"WarnIcon/oil.bin", 9U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/oil.png", 9U, 0U}}, .variant_count = 1,
       .x = 0, .y = 0, .w = 64, .h = 64 },
-    { .variants = {{"WarnIcon/abs.bin", 10U, 0U}}, .variant_count = 1,
+    { .variants = {{"WarnIcon/abs.png", 10U, 0U}}, .variant_count = 1,
       .x = 70, .y = 0, .w = 46, .h = 46 },
 };
 
@@ -1552,12 +1552,12 @@ static void test_fuel_threshold(lv_obj_t *parent)
     fuel_forester1_apply(&f, 26U);
     CHECK(!f.low);
     CHECK(strstr((const char *)lv_image_get_src(f.tick.img),
-                 "fuel1_white_tick.bin") != NULL);
+                 "fuel1_white_tick.png") != NULL);
 
     fuel_forester1_apply(&f, 25U);
     CHECK(f.low);
     CHECK(strstr((const char *)lv_image_get_src(f.tick.img),
-                 "fuel1_white_tick.bin") == NULL);
+                 "fuel1_white_tick.png") == NULL);
 
     /* 缓存：仍为红色时不换图，但液面数值继续更新 */
     fuel_forester1_apply(&f, 24U);

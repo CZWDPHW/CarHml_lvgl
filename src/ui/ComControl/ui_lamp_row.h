@@ -25,7 +25,7 @@ extern "C" {
 
 /* 样式层提供的单个灯配置 */
 typedef struct {
-    const char *icon;      /* 主图标路径，如 "WarnIcon/auto_lamp.bin" */
+    const char *icon;      /* 主图标路径，如 "WarnIcon/auto_lamp.png" */
     const char *icon_alt;  /* 备选图标路径（如近光灯故障图），NULL 表示无 */
     uint8_t code;          /* 主故障码 */
     uint8_t alt_code;      /* 触发备选图标的故障码，0 表示无 */

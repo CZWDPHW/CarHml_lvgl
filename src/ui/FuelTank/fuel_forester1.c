@@ -22,11 +22,11 @@ static void fuel_static_create(lv_obj_t *root)
     lv_obj_t *img = lv_image_create(root);
     lv_obj_t *label;
 
-    lv_image_set_src(img, ui_assets_path("SubaruForester/fuel1_bg.bin"));
+    lv_image_set_src(img, ui_assets_path("SubaruForester/fuel1_bg.png"));
     lv_obj_set_pos(img, 0, 0);
 
     img = lv_image_create(root);
-    lv_image_set_src(img, ui_assets_path("SubaruForester/fuel_44.bin"));
+    lv_image_set_src(img, ui_assets_path("SubaruForester/fuel_44.png"));
     lv_obj_set_pos(img, 66, 316);
 
     /* F：满油端，白色 */
@@ -61,7 +61,7 @@ bool fuel_forester1_create(fuel_forester1_t *fuel, lv_obj_t *parent,
 
     /* 初始用白色刻度图，0% 时液面在底部 */
     if(!ui_tick_create(&fuel->tick, fuel->root,
-                       "SubaruForester/fuel1_white_tick.bin",
+                       "SubaruForester/fuel1_white_tick.png",
                        FUEL_F1_TICK_X, 318, 108, 130, 210)) {
         return false;
     }
@@ -84,8 +84,8 @@ void fuel_forester1_apply(fuel_forester1_t *fuel, uint8_t percent)
     if(low != fuel->low) {
         fuel->low = low;
         lv_image_set_src(fuel->tick.img,
-                         ui_assets_path(low ? "SubaruForester/fuel1_tick.bin"
-                                            : "SubaruForester/fuel1_white_tick.bin"));
+                         ui_assets_path(low ? "SubaruForester/fuel1_tick.png"
+                                            : "SubaruForester/fuel1_white_tick.png"));
     }
 
     ui_tick_set_percent(&fuel->tick, percent);

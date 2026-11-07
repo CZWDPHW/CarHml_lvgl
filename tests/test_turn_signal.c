@@ -113,8 +113,8 @@ static void check_page(bool left, bool right)
     car = child_at(stack, 87, 95);
     CHECK(car != NULL);
     if(car == NULL) return;
-    lamps[0] = image_with_path(car, "SubaruForester/Deng_02.bin");
-    lamps[1] = image_with_path(car, "SubaruForester/Deng_03.bin");
+    lamps[0] = image_with_path(car, "SubaruForester/navigation/Deng_02.png");
+    lamps[1] = image_with_path(car, "SubaruForester/navigation/Deng_03.png");
     for(unsigned i = 0; i < 2U; ++i) {
         CHECK(arrows[i] != NULL && lamps[i] != NULL);
         if(arrows[i] == NULL || lamps[i] == NULL) continue;

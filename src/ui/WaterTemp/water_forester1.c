@@ -18,8 +18,8 @@
 #define WATER_F1_TICK_X 40
 
 /* 图标资源：正常温度计 / 高温告警 */
-#define WATER_F1_ICON_NORMAL "SubaruForester/wather_44.bin"
-#define WATER_F1_ICON_HIGH   "material2/water_hig.bin"
+#define WATER_F1_ICON_NORMAL "SubaruForester/wather_44.png"
+#define WATER_F1_ICON_HIGH   "material2/RotateSheet/water_hig.png"
 
 /* 创建底色、H/C 标记等静态元素 */
 static void water_static_create(lv_obj_t *root)
@@ -27,7 +27,7 @@ static void water_static_create(lv_obj_t *root)
     lv_obj_t *img = lv_image_create(root);
     lv_obj_t *label;
 
-    lv_image_set_src(img, ui_assets_path("SubaruForester/wather1_bg.bin"));
+    lv_image_set_src(img, ui_assets_path("SubaruForester/wather1_bg.png"));
     lv_obj_set_pos(img, 0, 0);
 
     /* H：高温端，红色 */
@@ -61,7 +61,7 @@ bool water_forester1_create(water_forester1_t *water, lv_obj_t *parent,
     water_static_create(water->root);
 
     if(!ui_tick_create(&water->tick, water->root,
-                       "SubaruForester/wather1_tick.bin",
+                       "SubaruForester/wather1_tick.png",
                        WATER_F1_TICK_X, 318, 108, 120, 210)) {
         return false;
     }
