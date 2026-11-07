@@ -133,8 +133,8 @@ static const settings_option_t s_temp_options[] = {
 #define UNIT_ROW_COUNT 3U
 
 /*
- * 仪表风格：选项直接取样式注册表（样式新增后自动出现在列表里）。
- * 注册表最多 8 条，超出部分不显示（本工程目前只有 forester1/general1）。
+ * 仪表风格：只列当前车型已迁移的可用样式（Qt PageMyCarStyle 按 currentCarId
+ * 生成列表）。最多显示 8 条，Forester 当前只有 Style1。
  */
 #define STYLE_MAX 8U
 
@@ -150,10 +150,10 @@ static const uint32_t s_card_bits[UI_SETTINGS_CARD_COUNT] = {
     UINT32_C(1) << 8, UINT32_C(1) << 9,
 };
 
-/* 返回行在列表中的下标：风格项数 + 1 */
+/* 返回行在列表中的下标：当前车型风格项数 + 1 */
 static uint8_t style_back(void)
 {
-    size_t count = ui_style_count();
+    size_t count = ui_app_style_option_count();
 
     if(count > STYLE_MAX) {
         count = STYLE_MAX;
@@ -182,12 +182,12 @@ static const char *const s_eco_labels[UI_SETTINGS_ECO_COUNT] = {
     "ECO DISPLAY ", "ECO INDICATOR ", "BACK",
 };
 
-/* 行程资讯子项：行程资讯/车辆设置未迁移，置灰 */
+/* 行程资讯子项：行程资讯未迁移，置灰 */
 static const char *const s_it_labels[UI_SETTINGS_IT_COUNT] = {
     "ITINERARY", "DRIVING ASSIST", "VEHICLE", "BACK",
 };
 static const bool s_it_enabled[UI_SETTINGS_IT_COUNT] = {
-    false, true, false, true,
+    false, true, true, true,
 };
 
 /* 驾驶员辅助子项：驻车辅助/底盘控制未迁移，置灰 */
@@ -201,6 +201,29 @@ static const bool s_assist_enabled[UI_SETTINGS_ASSIST_COUNT] = {
 /* 驾驶辅助三项：值来自 MCU 0x16 回读，OK 只下发命令 */
 static const char *const s_da_labels[UI_SETTINGS_DA_COUNT] = {
     "EMERGENCY BRAKING ", "LANE DEPARTURE ", "BLIND SPOT ", "BACK",
+};
+
+/* 车辆设置子项（Qt CarSettings.leftModel 顺序） */
+static const char *const s_veh_labels[UI_SETTINGS_VEH_COUNT] = {
+    "LIGHT SETTINGS", "TURN LIGHT", "DOORS", "WIPER", "SERVICE", "BACK",
+};
+static const bool s_veh_enabled[UI_SETTINGS_VEH_COUNT] = {
+    true, false, true, false, false, true,
+};
+
+/* 灯光设置（Qt LightSettings）：工厂配置门控项未迁移 */
+static const char *const s_light_labels[UI_SETTINGS_LIGHT_COUNT] = {
+    "WELCOME LIGHT ", "AUTO INTERIOR LIGHT ", "BACK",
+};
+
+/* 车门设置（Qt DoorSetting）：工厂配置门控项未迁移 */
+static const char *const s_door_labels[UI_SETTINGS_DOOR_COUNT] = {
+    "HORN FEEDBACK ", "AUTO UNLOCK ", "BACK",
+};
+
+/* Qt DoorSetting.autolock 的 3 个选项 */
+static const char *const s_auto_unlock_options[3] = {
+    "IGN OFF", "P SHIFT", "OFF",
 };
 
 /* 设置存储：由 main.c 注入（板端为持久设置，PC 为内存默认值） */
@@ -220,6 +243,12 @@ static bool s_da_emergency = true;
 static bool s_da_lane = true;
 static bool s_da_blind = true;
 static bool s_speed_warn_valid;
+
+/* 车辆设置项的 MCU 回读缓存（Qt SettingsMgr 缺省：开关 true / 选项 0） */
+static bool s_vs_welcome = true;
+static bool s_vs_interior = true;
+static bool s_vs_horn = true;
+static uint8_t s_vs_auto_unlock;
 
 void ui_settings_state_init(ui_settings_state_t *st)
 {
@@ -244,6 +273,9 @@ void ui_settings_state_init(ui_settings_state_t *st)
     st->it_index = NONE;
     st->assist_index = NONE;
     st->driving_assist_index = NONE;
+    st->vehicle_index = NONE;
+    st->light_index = NONE;
+    st->door_index = NONE;
     st->system_index = NONE;
     st->speed_warn_digit_index = 0U;
 }
@@ -810,6 +842,53 @@ static void drv_assist_page_style(ui_settings_page_t *page)
               page->st.driving_assist_index == UI_SETTINGS_DA_BACK, true);
 }
 
+/* 车辆设置：只有灯光设置/车门/返回可用，未迁移项置灰 */
+static void vehicle_page_style(ui_settings_page_t *page)
+{
+    for(uint8_t i = 0U; i < UI_SETTINGS_VEH_COUNT; ++i) {
+        row_style(page->vehicle_rows[i], page->st.vehicle_index == i,
+                  s_veh_enabled[i]);
+    }
+}
+
+/* 灯光设置：ON/OFF 只反映 MCU 0x16 回读 */
+static void light_page_style(ui_settings_page_t *page)
+{
+    switch_row_state(page->light_rows[UI_SETTINGS_LIGHT_WELCOME],
+                     page->st.light_index == UI_SETTINGS_LIGHT_WELCOME,
+                     s_vs_welcome);
+    switch_row_state(page->light_rows[UI_SETTINGS_LIGHT_AUTO_INTERIOR],
+                     page->st.light_index == UI_SETTINGS_LIGHT_AUTO_INTERIOR,
+                     s_vs_interior);
+    row_style(page->light_rows[UI_SETTINGS_LIGHT_BACK],
+              page->st.light_index == UI_SETTINGS_LIGHT_BACK, true);
+}
+
+/*
+ * 车门设置：喇叭响应 ON/OFF；自动解锁显示当前选项
+ * （Qt ItemDetails + PageListSelect，这里按 3 个选项循环，见回填说明）。
+ */
+static void door_page_style(ui_settings_page_t *page)
+{
+    lv_obj_t *state;
+
+    switch_row_state(page->door_rows[UI_SETTINGS_DOOR_HORN],
+                     page->st.door_index == UI_SETTINGS_DOOR_HORN, s_vs_horn);
+
+    row_style(page->door_rows[UI_SETTINGS_DOOR_AUTO_UNLOCK],
+              page->st.door_index == UI_SETTINGS_DOOR_AUTO_UNLOCK, true);
+    state = lv_obj_get_child(page->door_rows[UI_SETTINGS_DOOR_AUTO_UNLOCK], 1);
+    if(state != NULL) {
+        lv_label_set_text(state,
+                          s_auto_unlock_options[s_vs_auto_unlock % 3U]);
+        lv_obj_set_style_text_color(state,
+            lv_color_hex(UI_COLOR_WHITE), 0);
+    }
+
+    row_style(page->door_rows[UI_SETTINGS_DOOR_BACK],
+              page->st.door_index == UI_SETTINGS_DOOR_BACK, true);
+}
+
 /*
  * 常规设置：
  *   亮度行第 1 个子对象显示百分比；
@@ -965,7 +1044,7 @@ static void system_style(ui_settings_page_t *page);
 
 static void view_sync(ui_settings_page_t *page)
 {
-    lv_obj_t *lists[14];
+    lv_obj_t *lists[17];
     const char *title = "";
 
     lists[0] = page->mycar_list;
@@ -982,8 +1061,11 @@ static void view_sync(ui_settings_page_t *page)
     lists[11] = page->drv_assist_list;
     lists[12] = page->system_list;
     lists[13] = page->version_list;
+    lists[14] = page->vehicle_list;
+    lists[15] = page->light_list;
+    lists[16] = page->door_list;
 
-    for(uint8_t i = 0U; i < 14U; ++i) {
+    for(uint8_t i = 0U; i < 17U; ++i) {
         lv_obj_add_flag(lists[i], LV_OBJ_FLAG_HIDDEN);
     }
     lv_obj_add_flag(page->speed_warn_list, LV_OBJ_FLAG_HIDDEN);
@@ -1039,6 +1121,18 @@ static void view_sync(ui_settings_page_t *page)
     case UI_SETTINGS_VIEW_SPEED_WARN:
         title = "SPEED WARNING";
         lv_obj_remove_flag(page->speed_warn_list, LV_OBJ_FLAG_HIDDEN);
+        break;
+    case UI_SETTINGS_VIEW_VEHICLE:
+        title = "VEHICLE SETTINGS";
+        lv_obj_remove_flag(page->vehicle_list, LV_OBJ_FLAG_HIDDEN);
+        break;
+    case UI_SETTINGS_VIEW_LIGHT:
+        title = "LIGHT SETTINGS";
+        lv_obj_remove_flag(page->light_list, LV_OBJ_FLAG_HIDDEN);
+        break;
+    case UI_SETTINGS_VIEW_DOOR:
+        title = "DOOR SETTINGS";
+        lv_obj_remove_flag(page->door_list, LV_OBJ_FLAG_HIDDEN);
         break;
     case UI_SETTINGS_VIEW_ROOT:
     default:
@@ -1130,6 +1224,22 @@ static void list_center_current(ui_settings_page_t *page)
                         ? 0U : page->st.driving_assist_index,
                     UNIT_ROW_H);
         break;
+    case UI_SETTINGS_VIEW_VEHICLE:
+        list_center(page->vehicle_list,
+                    (page->st.vehicle_index == NONE) ? 0U
+                                                     : page->st.vehicle_index,
+                    UNIT_ROW_H);
+        break;
+    case UI_SETTINGS_VIEW_LIGHT:
+        list_center(page->light_list,
+                    (page->st.light_index == NONE) ? 0U : page->st.light_index,
+                    UNIT_ROW_H);
+        break;
+    case UI_SETTINGS_VIEW_DOOR:
+        list_center(page->door_list,
+                    (page->st.door_index == NONE) ? 0U : page->st.door_index,
+                    UNIT_ROW_H);
+        break;
     case UI_SETTINGS_VIEW_ROOT:
     default:
         /* 未锁定预览：列表从第一项开始 */
@@ -1161,6 +1271,9 @@ void ui_settings_page_apply(ui_settings_page_t *page)
     it_page_style(page);
     assist_page_style(page);
     drv_assist_page_style(page);
+    vehicle_page_style(page);
+    light_page_style(page);
+    door_page_style(page);
     speed_warn_page_style(page);
     version_refresh(page);
     list_center_current(page);
@@ -1177,9 +1290,9 @@ static void style_index_from_settings(ui_settings_page_t *page)
     }
 
     for(uint8_t i = 0U; i < style_back(); ++i) {
-        const char *id = ui_style_id_at(i);
+        const ui_style_desc_t *desc = ui_app_style_option_at(i);
 
-        if(id != NULL && strcmp(id, s_settings->values.dial_style) == 0) {
+        if(desc != NULL && strcmp(desc->id, s_settings->values.dial_style) == 0) {
             page->st.style_index = i;
         }
     }
@@ -1188,19 +1301,19 @@ static void style_index_from_settings(ui_settings_page_t *page)
 /* Qt PageMyCarStyle：确认后 SettingsMgr.dialStyle = i，并重载表盘 */
 static void apply_style(ui_settings_page_t *page)
 {
-    const char *id;
+    const ui_style_desc_t *desc;
 
     if(s_settings == NULL || page->st.style_index >= style_back()) {
         return;
     }
 
-    id = ui_style_id_at(page->st.style_index);
-    if(id == NULL) {
+    desc = ui_app_style_option_at(page->st.style_index);
+    if(desc == NULL) {
         return;
     }
 
-    (void)car_settings_set_dial_style(s_settings, id);
-    (void)ui_app_set_style(id);
+    /* 与 31 共用同一个入口：保存设置 + 重载表盘 + MCU 重取数 */
+    (void)ui_app_switch_style(desc->id);
 }
 
 /* Qt PageUnitSettings：OK 在选项间循环切换（立即改内存），确定返回 */
@@ -1298,6 +1411,9 @@ static void pop_to_root(ui_settings_state_t *st)
     st->it_index = NONE;
     st->assist_index = NONE;
     st->driving_assist_index = NONE;
+    st->vehicle_index = NONE;
+    st->light_index = NONE;
+    st->door_index = NONE;
 }
 
 /* 子页弹出到我的座驾：childIndex = -1 */
@@ -1334,6 +1450,25 @@ bool ui_settings_page_back(ui_settings_page_t *page)
         st->assist_index = NONE;
         st->root_locked = true;
         st->it_index = UI_SETTINGS_IT_ASSIST;
+        st->view = UI_SETTINGS_VIEW_ROOT;
+        break;
+    case UI_SETTINGS_VIEW_LIGHT:
+        /* 返回车辆设置，焦点回到 LIGHT SETTINGS */
+        st->light_index = NONE;
+        st->vehicle_index = UI_SETTINGS_VEH_LIGHT;
+        st->view = UI_SETTINGS_VIEW_VEHICLE;
+        break;
+    case UI_SETTINGS_VIEW_DOOR:
+        /* 返回车辆设置，焦点回到 DOORS */
+        st->door_index = NONE;
+        st->vehicle_index = UI_SETTINGS_VEH_DOOR;
+        st->view = UI_SETTINGS_VIEW_VEHICLE;
+        break;
+    case UI_SETTINGS_VIEW_VEHICLE:
+        /* 返回行程资讯列表，焦点回到 VEHICLE */
+        st->vehicle_index = NONE;
+        st->root_locked = true;
+        st->it_index = UI_SETTINGS_IT_VEHICLE;
         st->view = UI_SETTINGS_VIEW_ROOT;
         break;
     case UI_SETTINGS_VIEW_SPEED_WARN:
@@ -1547,6 +1682,65 @@ static void drv_assist_send(uint8_t index, bool on)
     }
 }
 
+/* Qt sendLightset：车辆设置项只发 0x16 SetGet，显示等 0x86 回读 */
+static void vehicle_send(uint8_t index, uint8_t status)
+{
+    car_cmd_t cmd;
+
+    if(s_cmd_cb == NULL) {
+        return;
+    }
+    if(car_cmd_set_vehicle_setting(&cmd, index, status)) {
+        s_cmd_cb(&cmd);
+    }
+}
+
+static bool veh_enabled(uint8_t index)
+{
+    return (index < UI_SETTINGS_VEH_COUNT) && s_veh_enabled[index];
+}
+
+/* 车辆设置：跳过置灰的未迁移项 */
+static void veh_step(ui_settings_state_t *st, int8_t step)
+{
+    uint8_t index = st->vehicle_index;
+    uint8_t i;
+
+    if(index == NONE) {
+        index = (step > 0) ? (uint8_t)(UI_SETTINGS_VEH_COUNT - 1U) : 0U;
+    }
+
+    for(i = 0U; i < UI_SETTINGS_VEH_COUNT; ++i) {
+        index = (uint8_t)(((int32_t)index + step +
+                           (int32_t)UI_SETTINGS_VEH_COUNT) %
+                          (int32_t)UI_SETTINGS_VEH_COUNT);
+        if(veh_enabled(index)) {
+            break;
+        }
+    }
+
+    st->vehicle_index = index;
+}
+
+/* 灯光设置/车门设置都是 3 行循环 */
+static void light_step(ui_settings_state_t *st, int8_t step)
+{
+    st->light_index = (st->light_index == NONE)
+                          ? ((step > 0) ? 0U : (uint8_t)(UI_SETTINGS_LIGHT_COUNT - 1U))
+                          : (uint8_t)(((int32_t)st->light_index + step +
+                                       (int32_t)UI_SETTINGS_LIGHT_COUNT) %
+                                      (int32_t)UI_SETTINGS_LIGHT_COUNT);
+}
+
+static void door_step(ui_settings_state_t *st, int8_t step)
+{
+    st->door_index = (st->door_index == NONE)
+                         ? ((step > 0) ? 0U : (uint8_t)(UI_SETTINGS_DOOR_COUNT - 1U))
+                         : (uint8_t)(((int32_t)st->door_index + step +
+                                      (int32_t)UI_SETTINGS_DOOR_COUNT) %
+                                     (int32_t)UI_SETTINGS_DOOR_COUNT);
+}
+
 static bool handle_it_key(ui_settings_page_t *page, uint8_t code)
 {
     ui_settings_state_t *st = &page->st;
@@ -1574,6 +1768,11 @@ static bool handle_it_key(ui_settings_page_t *page, uint8_t code)
             /* Qt PageItineraryItem → DrivePeopleHelp */
             st->assist_index = NONE;
             st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
+        }
+        else if(st->it_index == UI_SETTINGS_IT_VEHICLE) {
+            /* Qt PageItineraryItem → CarSettings */
+            st->vehicle_index = NONE;
+            st->view = UI_SETTINGS_VIEW_VEHICLE;
         }
         break;
     default:
@@ -1656,6 +1855,121 @@ static bool handle_driving_assist_key(ui_settings_page_t *page, uint8_t code)
         }
         else if(st->driving_assist_index == UI_SETTINGS_DA_BLIND) {
             drv_assist_send(3U, !s_da_blind);
+        }
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+/* 车辆设置：灯光设置/车门进入下一级，返回行程资讯列表 */
+static bool handle_vehicle_key(ui_settings_page_t *page, uint8_t code)
+{
+    ui_settings_state_t *st = &page->st;
+
+    switch(code) {
+    case UI_KEY_UP:
+        veh_step(st, -1);
+        break;
+    case UI_KEY_DOWN:
+        veh_step(st, 1);
+        break;
+    case UI_KEY_OK:
+        if(st->vehicle_index == NONE) {
+            st->vehicle_index = UI_SETTINGS_VEH_LIGHT;
+            break;
+        }
+        if(st->vehicle_index == UI_SETTINGS_VEH_BACK) {
+            /* 返回行程资讯列表，焦点回到 VEHICLE */
+            st->vehicle_index = NONE;
+            st->root_locked = true;
+            st->it_index = UI_SETTINGS_IT_VEHICLE;
+            st->view = UI_SETTINGS_VIEW_ROOT;
+        }
+        else if(st->vehicle_index == UI_SETTINGS_VEH_LIGHT) {
+            /* Qt CarSettings → LightSettings */
+            st->light_index = NONE;
+            st->view = UI_SETTINGS_VIEW_LIGHT;
+        }
+        else if(st->vehicle_index == UI_SETTINGS_VEH_DOOR) {
+            /* Qt CarSettings → DoorSetting */
+            st->door_index = NONE;
+            st->view = UI_SETTINGS_VIEW_DOOR;
+        }
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+/* 灯光设置：OK 按 MCU 回读值取反下发 0x16，显示等 0x86 回读 */
+static bool handle_light_key(ui_settings_page_t *page, uint8_t code)
+{
+    ui_settings_state_t *st = &page->st;
+
+    switch(code) {
+    case UI_KEY_UP:
+        light_step(st, -1);
+        break;
+    case UI_KEY_DOWN:
+        light_step(st, 1);
+        break;
+    case UI_KEY_OK:
+        if(st->light_index == NONE) {
+            st->light_index = UI_SETTINGS_LIGHT_WELCOME;
+        }
+        else if(st->light_index == UI_SETTINGS_LIGHT_BACK) {
+            st->light_index = NONE;
+            st->vehicle_index = UI_SETTINGS_VEH_LIGHT;
+            st->view = UI_SETTINGS_VIEW_VEHICLE;
+        }
+        else if(st->light_index == UI_SETTINGS_LIGHT_WELCOME) {
+            vehicle_send(10U, s_vs_welcome ? 0U : 1U);
+        }
+        else if(st->light_index == UI_SETTINGS_LIGHT_AUTO_INTERIOR) {
+            vehicle_send(11U, s_vs_interior ? 0U : 1U);
+        }
+        break;
+    default:
+        return false;
+    }
+
+    return true;
+}
+
+/*
+ * 车门设置：喇叭响应取反下发；
+ * 车门自动解锁按 Qt PageListSelect 的 3 个选项循环。
+ */
+static bool handle_door_key(ui_settings_page_t *page, uint8_t code)
+{
+    ui_settings_state_t *st = &page->st;
+
+    switch(code) {
+    case UI_KEY_UP:
+        door_step(st, -1);
+        break;
+    case UI_KEY_DOWN:
+        door_step(st, 1);
+        break;
+    case UI_KEY_OK:
+        if(st->door_index == NONE) {
+            st->door_index = UI_SETTINGS_DOOR_HORN;
+        }
+        else if(st->door_index == UI_SETTINGS_DOOR_BACK) {
+            st->door_index = NONE;
+            st->vehicle_index = UI_SETTINGS_VEH_DOOR;
+            st->view = UI_SETTINGS_VIEW_VEHICLE;
+        }
+        else if(st->door_index == UI_SETTINGS_DOOR_HORN) {
+            vehicle_send(15U, s_vs_horn ? 0U : 1U);
+        }
+        else if(st->door_index == UI_SETTINGS_DOOR_AUTO_UNLOCK) {
+            vehicle_send(16U, (uint8_t)((s_vs_auto_unlock + 1U) % 3U));
         }
         break;
     default:
@@ -2223,6 +2537,15 @@ bool ui_settings_page_key(ui_settings_page_t *page, const ui_key_event_t *evt)
     case UI_SETTINGS_VIEW_DRIVING_ASSIST:
         handled = handle_driving_assist_key(page, evt->code);
         break;
+    case UI_SETTINGS_VIEW_VEHICLE:
+        handled = handle_vehicle_key(page, evt->code);
+        break;
+    case UI_SETTINGS_VIEW_LIGHT:
+        handled = handle_light_key(page, evt->code);
+        break;
+    case UI_SETTINGS_VIEW_DOOR:
+        handled = handle_door_key(page, evt->code);
+        break;
     default:
         handled = false;
         break;
@@ -2405,6 +2728,32 @@ void ui_settings_page_set_driver_assist(ui_settings_page_t *page,
     }
 }
 
+void ui_settings_page_set_vehicle_settings(ui_settings_page_t *page,
+                                           bool welcome_light,
+                                           bool auto_interior_light,
+                                           bool horn_feedback,
+                                           uint8_t auto_door_unlock)
+{
+    bool changed = (s_vs_welcome != welcome_light) ||
+                   (s_vs_interior != auto_interior_light) ||
+                   (s_vs_horn != horn_feedback) ||
+                   (s_vs_auto_unlock != auto_door_unlock);
+
+    if(!changed) {
+        return;
+    }
+
+    s_vs_welcome = welcome_light;
+    s_vs_interior = auto_interior_light;
+    s_vs_horn = horn_feedback;
+    s_vs_auto_unlock = auto_door_unlock;
+
+    if(page != NULL && page->root != NULL) {
+        light_page_style(page);
+        door_page_style(page);
+    }
+}
+
 void ui_settings_page_set_pending(ui_settings_page_t *page, bool pending)
 {
     if(page == NULL || page->pending_hint == NULL) {
@@ -2524,12 +2873,12 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
     /* 仪表风格：选项 + 返回 */
     page->style_list = make_list(page->body);
     for(i = 0U; i < style_back(); ++i) {
-        const char *id = ui_style_id_at(i);
-        const ui_style_desc_t *desc = (id != NULL) ? ui_style_find(id) : NULL;
+        const ui_style_desc_t *desc = ui_app_style_option_at(i);
 
         (void)make_row(page->style_list, STYLE_ROW_X,
                        STYLE_ROW_H * (int32_t)i, STYLE_ROW_W, STYLE_ROW_H,
-                       (desc != NULL && desc->name != NULL) ? desc->name : id);
+                       (desc != NULL && desc->name != NULL) ? desc->name
+                                                           : "UNKNOWN");
     }
     (void)make_row(page->style_list, LIST_X, STYLE_ROW_H * (int32_t)style_back(),
                    LIST_W, ROW_H, "BACK");
@@ -2705,6 +3054,56 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
         }
 
         page->drv_assist_rows[i] = row;
+    }
+
+    /* 车辆设置：灯光设置 / 车门 / 返回（行高 60） */
+    page->vehicle_list = make_list(page->body);
+    for(i = 0U; i < UI_SETTINGS_VEH_COUNT; ++i) {
+        page->vehicle_rows[i] = make_row(page->vehicle_list, LIST_X,
+                                         ROW_H * (int32_t)i, LIST_W, ROW_H,
+                                         s_veh_labels[i]);
+    }
+
+    /* 灯光设置：迎宾灯 / 室内自动点灯 ON/OFF + 返回 */
+    page->light_list = make_list(page->body);
+    for(i = 0U; i < UI_SETTINGS_LIGHT_COUNT; ++i) {
+        lv_obj_t *row = make_row(page->light_list, LIST_X,
+                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
+                                 s_light_labels[i]);
+
+        if(i != UI_SETTINGS_LIGHT_BACK) {
+            lv_obj_t *label = lv_obj_get_child(row, 0);
+            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
+
+            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
+            lv_obj_set_pos(label, ROW_OFFSET_X,
+                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
+            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
+        }
+
+        page->light_rows[i] = row;
+    }
+
+    /* 车门设置：喇叭响应 ON/OFF、车门自动解锁选项 + 返回 */
+    page->door_list = make_list(page->body);
+    for(i = 0U; i < UI_SETTINGS_DOOR_COUNT; ++i) {
+        lv_obj_t *row = make_row(page->door_list, LIST_X,
+                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
+                                 s_door_labels[i]);
+
+        if(i != UI_SETTINGS_DOOR_BACK) {
+            lv_obj_t *label = lv_obj_get_child(row, 0);
+            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
+
+            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
+            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
+            lv_obj_set_pos(label, ROW_OFFSET_X,
+                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
+            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
+        }
+
+        page->door_rows[i] = row;
     }
 
     /* 底部提示：改动先留在内存，ACC 关闭时统一写入 */

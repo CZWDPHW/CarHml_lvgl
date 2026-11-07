@@ -32,6 +32,8 @@ static bool s_settings_open;
 static uint32_t s_settings_tick;
 static car_settings_t *s_settings_store;
 static ui_app_pending_cb_t s_pending_cb;
+/* 命令通道：设置页下发 + 样式切换后向 MCU 重新取数 */
+static ui_app_settings_cmd_cb_t s_cmd_cb;
 /* 互联会话标志：无 ZLink SDK 时由演示“已连接”或 6.6 回调置位 */
 static bool s_carplay_active;
 
@@ -211,6 +213,88 @@ bool ui_app_next_style(void)
     return ui_app_set_style(ui_style_at((index + 1) % count)->id);
 }
 
+/*
+ * Qt SerialComManmager::sendSwitchUI：切盘后重新读取会随页面重建而丢失的数据。
+ * 顺序与 Qt 一致：故障码 0x02 → 档位 0x33 → 胎压 0x0A → 高配子帧 0x16/0x1A →
+ * 主/小芯片/有线版本 0x30/0x31/0x29。
+ */
+static void style_refresh_send(void)
+{
+    static const uint8_t ids[] = { 0x02U, 0x33U, 0x0AU, 0x30U, 0x31U, 0x29U };
+    car_cmd_t cmd;
+    uint8_t high_func = 0x1AU;
+
+    if(s_cmd_cb == NULL) {
+        return;
+    }
+
+    for(size_t i = 0U; i < sizeof(ids) / sizeof(ids[0]); ++i) {
+        if(car_cmd_request(&cmd, ids[i])) {
+            s_cmd_cb(&cmd);
+        }
+    }
+
+    if(car_cmd_set_payload(&cmd, 0x16U, (uint8_t)CAR_OP_GET,
+                           &high_func, 1U)) {
+        s_cmd_cb(&cmd);
+    }
+}
+
+/* 统一样式切换入口：31 与设置页共用，负责保存与 MCU 重取数 */
+bool ui_app_switch_style(const char *id)
+{
+    const ui_style_desc_t *desc = ui_style_find(id);
+
+    if(desc == NULL || !desc->available) {
+        return false;
+    }
+
+    if(desc == s_desc && s_node != NULL) {
+        return true;
+    }
+
+    if(!ui_app_set_style(desc->id)) {
+        return false;
+    }
+
+    if(s_settings_store != NULL) {
+        (void)car_settings_set_dial_style(s_settings_store, desc->id);
+    }
+
+    style_refresh_send();
+    return true;
+}
+
+/* Qt onSteeringKeySwitch：只在当前车型的合法样式间循环 */
+bool ui_app_style_switch_next(void)
+{
+    const ui_style_desc_t *next = ui_style_next_for_vehicle(s_desc);
+
+    if(next == NULL || next == s_desc) {
+        return false;
+    }
+
+    return ui_app_switch_style(next->id);
+}
+
+/* 当前车型由已装载样式决定；未装载时按默认样式所属车型 */
+static const char *style_vehicle(void)
+{
+    const ui_style_desc_t *desc = (s_desc != NULL) ? s_desc : ui_style_default();
+
+    return (desc != NULL) ? desc->vehicle : NULL;
+}
+
+size_t ui_app_style_option_count(void)
+{
+    return ui_style_vehicle_count(style_vehicle());
+}
+
+const ui_style_desc_t *ui_app_style_option_at(size_t index)
+{
+    return ui_style_vehicle_at(style_vehicle(), index);
+}
+
 /* 返回当前样式描述，供 PC 演示按钮等外部查询 */
 const ui_style_desc_t *ui_app_current_style(void)
 {
@@ -284,6 +368,13 @@ void ui_app_apply(const car_state_view_t *view)
     ui_settings_page_set_speed_warning(
         &s_settings_page, s_last_view.state.speed_warning.valid,
         s_last_view.state.speed_warning.speed_kph);
+    /* 车辆设置项同样只显示 MCU 0x16 回读值 */
+    ui_settings_page_set_vehicle_settings(
+        &s_settings_page,
+        s_last_view.state.vehicle_setting.welcome_light,
+        s_last_view.state.vehicle_setting.auto_interior_light,
+        s_last_view.state.vehicle_setting.horn_feedback,
+        s_last_view.state.vehicle_setting.auto_door_unlock);
     ui_settings_page_set_version(
         &s_settings_page, s_last_view.state.version.main,
         s_last_view.state.version.main_valid, s_last_view.state.version.chip,
@@ -340,9 +431,10 @@ void ui_app_settings_set_settings(car_settings_t *settings)
     }
 }
 
-/* 注入命令通道：设置页的背光/超速报警下发 */
+/* 注入命令通道：设置页下发 + 样式切换后的 MCU 重取数 */
 void ui_app_settings_set_cmd_cb(ui_settings_page_cmd_cb_t cb)
 {
+    s_cmd_cb = cb;
     ui_settings_page_set_cmd_cb(cb);
 }
 

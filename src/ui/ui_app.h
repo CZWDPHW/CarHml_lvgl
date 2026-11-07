@@ -33,8 +33,22 @@ void ui_app_deinit(void);
  */
 bool ui_app_set_style(const char *id);
 
-/* 按注册表顺序切到下一个样式（循环）；样式表为空时返回 false */
+/* 按注册表顺序切到下一个样式（循环）；仅供 PC 演示/测试遍历全部样式 */
 bool ui_app_next_style(void);
+
+/*
+ * 统一样式切换入口（Qt 31 与设置页 DIAL STYLE 共用）：
+ *   切换页面 → 保存到设置模型 → 重新向 MCU 请求切换后需要刷新的数据。
+ * id 不存在或装载失败返回 false，当前样式保持不变。
+ */
+bool ui_app_switch_style(const char *id);
+
+/* 同车型下一个可用样式（Qt onSteeringKeySwitch）；没有其它样式时返回 false */
+bool ui_app_style_switch_next(void);
+
+/* 当前车型的风格选项（Qt PageMyCarStyle 按 currentCarId 生成列表） */
+size_t ui_app_style_option_count(void);
+const ui_style_desc_t *ui_app_style_option_at(size_t index);
 
 /* 取当前样式的描述，未装载任何样式时返回 NULL */
 const ui_style_desc_t *ui_app_current_style(void);

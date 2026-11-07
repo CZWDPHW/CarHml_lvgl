@@ -2224,6 +2224,59 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 
 **验收**：PC通过内存端口核对发送字节和响应状态；实机测试需用户确认并在静止台架执行；无响应/断链保持真实状态，切风格无残留对象和重复计时。
 
+**实现状态（2026-11-07，风格切换闭环）**
+
+- `ui_style_desc_t` 新增 `vehicle`（对应 Qt `currentCarId`）与 `available`（已迁移可上线）：
+  `forester1` → `subaru_forester`（Forester Style1）；`general1` → `public_ui`（PublicUi Style6 占位）。
+  general1 不再被当成 Forester 的后续风格，PC 演示仍可用 `ui_app_next_style()` 遍历全部注册项。
+- 新增 `ui_style_vehicle_count/at`、`ui_style_next_for_vehicle`、`ui_style_default`；设置页 `DIAL STYLE`
+  与 31 都按当前车型过滤。Forester 当前只有 Style1，因此 31 保持原样式而不是跳到 general1。
+- 新增统一入口 `ui_app_switch_style()`：切换页面 → 写 `car_settings.dial_style`（仍按 ACC 关闭统一落盘）
+  → 按 Qt `SerialComManmager::sendSwitchUI()` 依次下发 `0x02`、`0x33`、`0x0A`、`0x16`（payload `0x1A`，GET）、
+  `0x30`、`0x31`、`0x29` 重新取数。设置页确认与 31 共用该入口，命令通道复用 `ui_app_settings_set_cmd_cb`。
+- 31 改为在 `map_key` 中逐条立即执行，不再折叠到批次结束，修正同批 31 与方向键的相对顺序（14.6 第 5 条）；
+  设置页可见时仍屏蔽；`ctx.style_switch` 保留为观测标记。
+- 启动样式只接受“默认车型 + available”的 id：旧配置里的 `general1` 或未知 id 回落到 `forester1`。
+- 未迁移：Forester Style2/3/4、PublicUi 其它风格均未注册；31 不会轮询到不存在的页面。
+- 验证：`cmake --build build -j8` 通过；`ctest` 6/6 通过（`carmw_steering_key` 363 checks / 0 failures）；
+  PC 启动 `timeout 4 DISPLAY=:0 ./build/bin/carmw_ui_demo` exit=124；`build_board` 通过，
+  `bin/carmw_ui_demo` MD5 `96d9a8cc0673f88bedd7d2ec1c938d81`。
+
+**实现状态（2026-11-07，车辆设置 / 灯光 / 车门命令闭环）**
+
+- 数据模型：`car_state_t` 新增 `vehicle_setting`（`car_vehicle_setting_t`），保存 Qt `SettingsManager::updateQashqaiSetting`
+  的 index 10/11/13/14/15/16/24/25/28 与扩展 ack 的 index 32/33；缺省值与 Qt 一致（开关 true、选项 0）。
+- 回读：`car_decode_high_func()` 的 `0x86` 分支改为 `switch(index)`，新增上述 index；
+  `data[2] == 0` 走压缩编码 `(status<<6)|index`，`data[1] == 0` 走扩展 ack `(status<<4)|control`
+  （control 1 = 灯光关闭延时，control 2 = 点灯灵敏度）。
+- 命令：新增 `car_cmd_set_vehicle_setting()` / `car_cmd_set_vehicle_setting_ext()`，
+  严格对齐 Qt `SerialComManmager::sendLightset()`：`0x16` SetGet，payload `{0x86, (status<<6)|index, 0}`
+  或 `{0x86, 0, (status<<4)|control}`。旧 `car_cmd_set_light()`（0x87）与 `car_cmd_set_car_setting()`（0x3B）保留给未迁移路径，未复用。
+- 设置页：新增 `VIEW_VEHICLE` / `VIEW_LIGHT` / `VIEW_DOOR` 三级页面与 `vehicle/light/door index` 状态；
+  `行程资讯 → VEHICLE → 灯光设置 / 车门` 可逐级进入，BACK/13 逐级返回。
+  灯光页“迎宾灯 / 室内自动点灯”、车门页“喇叭响应”OK 按 MCU 回读值取反下发；
+  “车门自动解锁”按 Qt `PageListSelect` 的 3 个选项（IGN OFF / P SHIFT / OFF）在单行内循环。
+  显示不做本地翻转，等 `0x86` 回读刷新。
+- `ui_app_apply()` 注入 `car_state.vehicle_setting` 四项（迎宾灯 / 室内自动点灯 / 喇叭响应 / 自动解锁）。
+- 未迁移（Qt 工厂配置缺省 false，菜单不显示）：点灯灵敏度、灯光关闭延时、外部车门、单车门解锁、
+  智能钥匙上锁、选择解锁、车门自动上锁、远程启动、转向灯、雨刷器、保养设置。
+- 验证：`cmake --build build -j8` 通过；`ctest` 6/6 通过（`carmw_steering_key` 新增
+  `test_settings_vehicle_light`，覆盖三级导航、迎宾灯/喇叭/自动解锁命令字节与“显示等回读”）；
+  `test_command` 覆盖新构造器字节与 index/control 越界；`test_decode` 覆盖 0x86 车辆设置与扩展 ack；
+  `cmake --build build_board -j8` 通过。
+
+- **下一步**：14.9 剩余“车辆设置 / 灯光 / 门锁等命令闭环”中，受 Qt 工厂配置门控的项目
+  （点灯灵敏度、灯光关闭延时、外部车门、单车门解锁、智能钥匙、选择解锁、车门自动上锁、远程启动）
+  桌面端默认不显示，需确认真实车型配置后再接线；转向灯/雨刷器/保养设置仍待迁移；
+  真实 ZLink 会话仍待 6.6。
+
+**性能记录（2026-11-07，板端中间卡片切换卡顿）**
+
+- T507 板端 `lv_timer_handler()` 日志显示，启动首轮有约 5.5 秒长调用；稳定运行期间大多约 3–10ms，调用频率约 45–65 次/秒。该计数是 handler 调用频率，不等同屏幕真实 FPS。
+- 用户确认主要卡顿发生在切换中间卡片时。代码检查发现 `card_step()` 每次按键都调用掩码同步；掩码未变时仍重复遍历全部卡片、恢复位置并更新可见标志，随后切换又更新一遍。
+- 已优化 `page_subaru_forester1.c`：卡片布局与位置仅在首次显示时初始化；正常切卡只隐藏旧卡、显示新卡；按键仅在卡片设置掩码变化时执行掩码同步。
+- 验证：`cmake --build build_board -j8`、`cmake --build build -j8` 均通过；`ctest --test-dir build --output-on-failure` 6/6 通过。优化后仍需部署至板端复测切卡耗时；尚无优化后板端 FPS/卡顿改善记录，E3 实机性能验收保持未完成。
+
 ### 14.10 步骤6.6：真实CarPlay / Android Auto / HiCar迁移
 
 **准入条件**：确认可用的SDK、有效使用授权、T507对应库和头文件、运行依赖、蓝牙/Wi-Fi服务与脚本、视频解码/显示接口。条件不齐只完成接口契约和独立模拟测试，不宣称互联可用。

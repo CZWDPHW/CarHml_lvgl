@@ -21,6 +21,7 @@
 #include "ui/car_ui_key.h"
 #include "ui/ui_app.h"
 #include "ui/ui_node.h"
+#include "ui/ui_style.h"
 
 #define CHECK(cond)                                                          \
     do {                                                                     \
@@ -106,6 +107,7 @@ static lv_obj_t *s_stack;
 /* 与 Qt settingStackView 一致的下钻顺序：先选分类，再选中子项 */
 #define ROOT_MY_CAR_INDEX 2U
 #define ROOT_INFO_INDEX 1U
+#define ROOT_ITINERARY_INDEX 0U
 #define MYCAR_STYLE_INDEX 0U
 #define MYCAR_UNIT_INDEX 1U
 #define MYCAR_CARD_INDEX 2U
@@ -677,7 +679,7 @@ static void test_held_repeat(void)
     teardown_forester();
 }
 
-/* 31 只切样式：新样式内部从第 0 张卡片开始 */
+/* 31 只在当前车型合法样式内切换，不会跳到其它车型的占位样式 */
 static void test_style_switch_key(void)
 {
     ui_dispatch_ctx_t ctx = {0};
@@ -697,7 +699,152 @@ static void test_style_switch_key(void)
     CHECK(car_ui_key_dispatch(&s_link, &ctx) == 1U);
     CHECK(ctx.style_switch);
     CHECK(!ctx.nav_home);
+    /* Forester 目前只迁移了 Style1：general1 属于 PublicUi，不得被选到 */
+    CHECK(strcmp(ui_app_current_style()->id, "forester1") == 0);
 
+    teardown_forester();
+}
+
+/* 风格列表只含当前车型的可用样式（Qt PageMyCarStyle） */
+static void test_style_options_per_vehicle(void)
+{
+    setup_forester();
+
+    CHECK(ui_app_style_option_count() == 1U);
+    CHECK(ui_app_style_option_at(0U) != NULL);
+    CHECK(strcmp(ui_app_style_option_at(0U)->id, "forester1") == 0);
+    CHECK(ui_style_vehicle_count("subaru_forester") == 1U);
+    CHECK(ui_style_vehicle_count("public_ui") == 1U);
+    CHECK(ui_style_default() != NULL);
+
+    /* 同一车型没有第二个样式：31 不改变当前样式 */
+    CHECK(!ui_app_style_switch_next());
+    CHECK(strcmp(ui_app_current_style()->id, "forester1") == 0);
+
+    teardown_forester();
+}
+
+/* 统一入口：切换后保存 dial_style，并按 Qt sendSwitchUI 重新向 MCU 取数 */
+static uint8_t s_cmd_ids[16];
+static size_t s_cmd_count;
+static car_cmd_t s_last_cmd;
+
+static void capture_cmd(const car_cmd_t *cmd)
+{
+    if(s_cmd_count < sizeof(s_cmd_ids)) {
+        s_cmd_ids[s_cmd_count] = cmd->cmd_id;
+        ++s_cmd_count;
+    }
+    s_last_cmd = *cmd;
+}
+
+static void test_style_switch_persists_and_refreshes(void)
+{
+    static const uint8_t expected[] = {
+        0x02U, 0x33U, 0x0AU, 0x30U, 0x31U, 0x29U, 0x16U,
+    };
+
+    setup_forester();
+    ui_app_settings_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+
+    /* 已是当前样式：不重载、不重复取数 */
+    CHECK(ui_app_switch_style("forester1"));
+    CHECK(s_cmd_count == 0U);
+
+    /* 用占位样式验证真实切换路径（完成后回到 Forester） */
+    CHECK(ui_app_switch_style("general1"));
+    CHECK(strcmp(ui_app_current_style()->id, "general1") == 0);
+    CHECK(strcmp(s_settings.values.dial_style, "general1") == 0);
+    CHECK(s_cmd_count == sizeof(expected) / sizeof(expected[0]));
+    for(size_t i = 0U; i < s_cmd_count && i < sizeof(expected); ++i) {
+        CHECK(s_cmd_ids[i] == expected[i]);
+    }
+
+    CHECK(ui_app_switch_style("forester1"));
+    CHECK(strcmp(ui_app_current_style()->id, "forester1") == 0);
+    CHECK(strcmp(s_settings.values.dial_style, "forester1") == 0);
+
+    ui_app_settings_set_cmd_cb(NULL);
+    teardown_forester();
+}
+
+/*
+ * 行程资讯 → 车辆设置 → 灯光设置：OK 只下发 0x16/0x86，
+ * 显示等 MCU 回读，不在本地翻转。
+ */
+static void test_settings_vehicle_light(void)
+{
+    setup_forester();
+    ui_app_settings_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(ui_app_settings_is_open());
+
+    /* 根页右移到“行程资讯”并锁定，焦点落在 DRIVING ASSIST */
+    root_move_to(ROOT_ITINERARY_INDEX);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 下移到 VEHICLE，进入车辆设置 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(ui_app_settings_is_open());
+
+    /* 首次 OK 选中 LIGHT SETTINGS，再 OK 进入灯光设置 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 首次 OK 选中 WELCOME LIGHT，再 OK 按回读值取反下发 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 0U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 0x16U);
+    CHECK(s_last_cmd.op == CAR_OP_SET_GET);
+    CHECK(s_last_cmd.len == 3U);
+    CHECK(s_last_cmd.payload[0] == 0x86U);
+    CHECK(s_last_cmd.payload[1] == 0x0AU); /* index 10 迎宾灯 */
+    CHECK(s_last_cmd.payload[2] == 0x00U); /* 回读 ON -> 下发 OFF */
+
+    /* 返回车辆设置，下移到 DOORS，进入车门设置 */
+    push_key(20U, 1U); /* 下移到 AUTO INTERIOR */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* 下移到 BACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 返回车辆设置，焦点在 LIGHT SETTINGS */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* 下移到 DOORS */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 进入车门设置 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 选中 HORN FEEDBACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 喇叭响应取反下发 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 2U);
+    CHECK(s_last_cmd.cmd_id == 0x16U);
+    CHECK(s_last_cmd.payload[0] == 0x86U);
+    CHECK(s_last_cmd.payload[1] == 0x0FU); /* index 15 */
+    CHECK(s_last_cmd.payload[2] == 0x00U);
+
+    /* 下移到自动解锁，OK 循环到下一选项（缺省 0 -> 1） */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 3U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 16U));
+
+    ui_app_settings_set_cmd_cb(NULL);
     teardown_forester();
 }
 
@@ -799,6 +946,9 @@ int main(void)
     test_long_press_maps_left_right();
     test_held_repeat();
     test_style_switch_key();
+    test_style_options_per_vehicle();
+    test_style_switch_persists_and_refreshes();
+    test_settings_vehicle_light();
     test_batch_order();
     test_card_mask_live();
     test_empty_queue();

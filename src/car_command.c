@@ -314,6 +314,39 @@ bool car_cmd_set_driver_assist(car_cmd_t *req, uint8_t index, bool on)
                                (uint16_t)sizeof(payload));
 }
 
+bool car_cmd_set_vehicle_setting(car_cmd_t *req, uint8_t index, uint8_t status)
+{
+    uint8_t payload[3];
+
+    if(index < 1U || index > 31U) {
+        return false;
+    }
+
+    payload[0] = 0x86U;
+    payload[1] = (uint8_t)(((status & 0x03U) << 6) | (index & 0x3FU));
+    payload[2] = 0U;
+
+    return car_cmd_set_payload(req, 0x16, (uint8_t)CAR_OP_SET_GET, payload,
+                               (uint16_t)sizeof(payload));
+}
+
+bool car_cmd_set_vehicle_setting_ext(car_cmd_t *req, uint8_t control,
+                                     uint8_t status)
+{
+    uint8_t payload[3];
+
+    if(control < 1U || control > 2U) {
+        return false;
+    }
+
+    payload[0] = 0x86U;
+    payload[1] = 0U;
+    payload[2] = (uint8_t)(((status & 0x0FU) << 4) | (control & 0x0FU));
+
+    return car_cmd_set_payload(req, 0x16, (uint8_t)CAR_OP_SET_GET, payload,
+                               (uint16_t)sizeof(payload));
+}
+
 bool car_cmd_send_debug(car_cmd_t *req, uint8_t id, uint8_t action, uint8_t num)
 {
     uint8_t payload[3];

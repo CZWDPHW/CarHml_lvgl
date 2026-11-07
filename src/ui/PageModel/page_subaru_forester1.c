@@ -107,6 +107,7 @@ typedef struct {
     lv_area_t card_orig[UI_CARD_MAX]; /* 卡片原始区域（x1,y1,x2,y2），隐藏后用于还原 */
     uint8_t card_count;
     uint8_t card_index;     /* 当前卡的注册序号，UI_CARD_NONE 表示无可见卡 */
+    uint8_t card_layout_initialized;
     uint32_t card_mask;     /* 已生效的设置位图，变化时重建可见集合 */
 
     /* ECO 指示图标：Qt IconGeneral(350,380) 在左表盘容器内，无故障码 */
@@ -597,18 +598,23 @@ static void card_show(s1_page_t *ui, uint8_t index)
         return;
     }
 
-    lv_obj_set_layout(ui->central_stack, LV_LAYOUT_NONE);
-
-    for(i = 0U; i < ui->card_count; ++i) {
-        lv_obj_t *card = ui->cards[i];
-
-        lv_obj_set_pos(card, ui->card_orig[i].x1, ui->card_orig[i].y1);
-
-        if(i == index) {
-            lv_obj_remove_flag(card, LV_OBJ_FLAG_HIDDEN);
+    if(!ui->card_layout_initialized) {
+        lv_obj_set_layout(ui->central_stack, LV_LAYOUT_NONE);
+        for(i = 0U; i < ui->card_count; ++i) {
+            lv_obj_set_pos(ui->cards[i], ui->card_orig[i].x1,
+                           ui->card_orig[i].y1);
+            if(i != index) {
+                lv_obj_add_flag(ui->cards[i], LV_OBJ_FLAG_HIDDEN);
+            }
         }
-        else {
-            lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN);
+        ui->card_layout_initialized = 1U;
+    }
+    else if(ui->card_index != index) {
+        if(ui->card_index != UI_CARD_NONE && ui->card_index < ui->card_count) {
+            lv_obj_add_flag(ui->cards[ui->card_index], LV_OBJ_FLAG_HIDDEN);
+        }
+        if(index != UI_CARD_NONE) {
+            lv_obj_remove_flag(ui->cards[index], LV_OBJ_FLAG_HIDDEN);
         }
     }
 
@@ -648,8 +654,13 @@ static void card_step(s1_page_t *ui, int8_t step)
         return;
     }
 
-    /* 每次翻卡先同步一次设置里的可见集合；当前卡仍勾选时保留，否则落到第一张可见卡 */
-    card_set_mask(ui, ui_app_center_card_mask());
+    /* 掩码已在车况更新时同步；按键路径只同步确有变化的设置值。 */
+    {
+        uint32_t mask = ui_app_center_card_mask();
+        if(mask != ui->card_mask) {
+            card_set_mask(ui, mask);
+        }
+    }
 
     if(ui->card_index == UI_CARD_NONE) {
         return;

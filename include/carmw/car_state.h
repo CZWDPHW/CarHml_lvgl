@@ -284,6 +284,26 @@ typedef struct {
     bool valid;
 } car_driver_assist_t;
 
+/*
+ * 车辆设置项（Qt SettingsMgr，由 0x16 SetGet 的 0x86 ack 回读）。
+ * 与驾驶辅助三项一样只保存 MCU 真实值，UI 不本地翻转。
+ * 下标与 Qt SettingsManager::updateQashqaiSetting 的 index 一致。
+ */
+typedef struct {
+    bool welcome_light;           /* index 10 迎宾灯 */
+    bool auto_interior_light;     /* index 11 室内自动点灯 */
+    bool external_doors;          /* index 13 外部车门开关 */
+    bool single_door_unlock;      /* index 14 单车门解锁 */
+    bool horn_feedback;           /* index 15 喇叭响应 */
+    uint8_t auto_door_unlock;     /* index 16 车门自动解锁：0 点火关闭 / 1 P 挡 / 2 OFF */
+    bool smart_door_unlock;       /* index 24 智能钥匙车门上锁 */
+    bool select_unlock;           /* index 25 选择解锁 */
+    uint8_t auto_door_lock;       /* index 28 车门自动上锁：0 车速 / 1 P 挡 / 2 OFF */
+    uint8_t headlight_sensitivity;/* index 33 点灯灵敏度：0~3 */
+    uint8_t headlight_off_delay;  /* index 32 灯光关闭延时：0~7 */
+    bool valid;                   /* 是否已收到过 MCU 回读 */
+} car_vehicle_setting_t;
+
 typedef struct {
     uint8_t sub_id;
     uint8_t drive_mode;
@@ -537,6 +557,8 @@ typedef struct {
     bool speed_limit_on;
     /* 驾驶辅助三项：MCU 回读的真实状态，不由本地翻转 */
     car_driver_assist_t driver_assist;
+    /* 车辆设置项：灯光/车门等开关的 MCU 回读真实状态 */
+    car_vehicle_setting_t vehicle_setting;
     /* 雷达显示开关：Qt SettingsMgr.radaronoff（实为“雷达开启”），缺省开启 */
     bool radar_on;
     /* 四驱灯/提示可见性：Qt SettingsMgr.show4h，缺省关闭 */

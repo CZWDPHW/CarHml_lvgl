@@ -414,30 +414,90 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
          * Qt QashqaiSet 设置项回读：
          *   len == 3 且 data[2] == 0 -> 压缩编码，index = data[1] & 0x3F，
          *   status = (data[1] >> 6) & 0x03，status == 1 表示开。
-         *   len == 3 且 data[1] == 0 -> 扩展 ack（index 32/33），本工程三项之外。
+         *   本工程保存 index 1~3 驾驶辅助，10/11/13/14/15/16/24/25/28 车辆设置。
+         *   len == 3 且 data[1] == 0 -> 扩展 ack，control 1 = 灯光关闭延时（32），
+         *   control 2 = 点灯灵敏度（33）。
          *   其余按位图：data[1] bit0 紧急制动 / bit1 车道偏离 / bit2 变道盲区。
          */
         if(len == 3U && data[2] == 0U) {
             uint8_t index = (uint8_t)(data[1] & 0x3FU);
             uint8_t status = (uint8_t)((data[1] >> 6) & 0x03U);
+            car_vehicle_setting_t *vs = &state->vehicle_setting;
 
-            if(index >= 1U && index <= 3U) {
+            if(index >= 1U && index <= 31U) {
                 bool on = (status == 1U);
 
-                if(index == 1U) {
+                switch(index) {
+                case 1U:
                     state->driver_assist.emergency_braking = on;
-                }
-                else if(index == 2U) {
+                    state->driver_assist.valid = true;
+                    break;
+                case 2U:
                     state->driver_assist.lane_departure_warning = on;
-                }
-                else {
+                    state->driver_assist.valid = true;
+                    break;
+                case 3U:
                     state->driver_assist.blind_spot_warning = on;
+                    state->driver_assist.valid = true;
+                    break;
+                case 10U:
+                    vs->welcome_light = on;
+                    vs->valid = true;
+                    break;
+                case 11U:
+                    vs->auto_interior_light = on;
+                    vs->valid = true;
+                    break;
+                case 13U:
+                    vs->external_doors = on;
+                    vs->valid = true;
+                    break;
+                case 14U:
+                    vs->single_door_unlock = on;
+                    vs->valid = true;
+                    break;
+                case 15U:
+                    vs->horn_feedback = on;
+                    vs->valid = true;
+                    break;
+                case 16U:
+                    vs->auto_door_unlock = (uint8_t)(status & 0x03U);
+                    vs->valid = true;
+                    break;
+                case 24U:
+                    vs->smart_door_unlock = on;
+                    vs->valid = true;
+                    break;
+                case 25U:
+                    vs->select_unlock = on;
+                    vs->valid = true;
+                    break;
+                case 28U:
+                    vs->auto_door_lock = (uint8_t)(status & 0x03U);
+                    vs->valid = true;
+                    break;
+                default:
+                    break;
                 }
-                state->driver_assist.valid = true;
             }
         }
         else if(len == 3U && data[1] == 0U) {
-            /* 扩展 ack（control 1/2 对应 index 32/33），本工程不保存 */
+            /*
+             * 扩展 ack：control 1 灯光关闭延时（index 32），
+             * control 2 点灯灵敏度（index 33）。
+             */
+            uint8_t control = (uint8_t)(data[2] & 0x0FU);
+            uint8_t status = (uint8_t)((data[2] >> 4) & 0x0FU);
+            car_vehicle_setting_t *vs = &state->vehicle_setting;
+
+            if(control == 1U) {
+                vs->headlight_off_delay = (uint8_t)(status & 0x07U);
+                vs->valid = true;
+            }
+            else if(control == 2U) {
+                vs->headlight_sensitivity = (uint8_t)(status & 0x03U);
+                vs->valid = true;
+            }
         }
         else {
             state->driver_assist.emergency_braking = (data[1] & 0x01U) != 0U;

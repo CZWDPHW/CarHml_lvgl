@@ -50,16 +50,19 @@ typedef enum {
     UI_SETTINGS_VIEW_SPEED_WARN,       /* 常规设置 → 超速预警值 */
     UI_SETTINGS_VIEW_SYSTEM,            /* 系统设置分类列表 */
     UI_SETTINGS_VIEW_VERSION,           /* 系统设置 → 版本信息 */
+    UI_SETTINGS_VIEW_VEHICLE,           /* 行程资讯 → 车辆设置 */
+    UI_SETTINGS_VIEW_LIGHT,             /* 车辆设置 → 灯光设置 */
+    UI_SETTINGS_VIEW_DOOR,              /* 车辆设置 → 车门设置 */
 } ui_settings_view_t;
 
 /*
  * 行程资讯子项（Qt PageItineraryItem）：
- * 行程资讯 / 车辆设置未迁移，置灰；驾驶员辅助进入下一级。
+ * 行程资讯未迁移，置灰；驾驶员辅助/车辆设置进入下一级。
  */
 typedef enum {
     UI_SETTINGS_IT_TRIP = 0,    /* 行程资讯（未迁移） */
     UI_SETTINGS_IT_ASSIST = 1,  /* 驾驶员辅助 */
-    UI_SETTINGS_IT_VEHICLE = 2, /* 车辆设置（未迁移） */
+    UI_SETTINGS_IT_VEHICLE = 2, /* 车辆设置 */
     UI_SETTINGS_IT_BACK = 3,    /* 返回 */
     UI_SETTINGS_IT_COUNT = 4,
 } ui_settings_it_item_t;
@@ -123,6 +126,43 @@ typedef enum {
     UI_SETTINGS_ECO_COUNT = 3,
 } ui_settings_eco_item_t;
 
+/*
+ * 车辆设置子项（Qt CarSettings.leftModel 顺序）。
+ * 转向灯/雨刷器/保养设置尚未迁移，置灰不可进入。
+ */
+typedef enum {
+    UI_SETTINGS_VEH_LIGHT = 0,   /* 灯光设置 */
+    UI_SETTINGS_VEH_TURN = 1,    /* 转向灯（未迁移） */
+    UI_SETTINGS_VEH_DOOR = 2,    /* 车门设置 */
+    UI_SETTINGS_VEH_WIPER = 3,   /* 雨刷器（未迁移） */
+    UI_SETTINGS_VEH_SERVICE = 4, /* 保养设置（未迁移） */
+    UI_SETTINGS_VEH_BACK = 5,    /* 返回 */
+    UI_SETTINGS_VEH_COUNT = 6,
+} ui_settings_vehicle_item_t;
+
+/*
+ * 灯光设置（Qt LightSettings）：迎宾灯 index 10、室内自动点灯 index 11。
+ * 点灯灵敏度/灯光关闭延时受工厂配置门控（缺省关闭），本工程暂不迁移。
+ */
+typedef enum {
+    UI_SETTINGS_LIGHT_WELCOME = 0,       /* 0x16 index 10 */
+    UI_SETTINGS_LIGHT_AUTO_INTERIOR = 1, /* 0x16 index 11 */
+    UI_SETTINGS_LIGHT_BACK = 2,          /* 返回 */
+    UI_SETTINGS_LIGHT_COUNT = 3,
+} ui_settings_light_item_t;
+
+/*
+ * 车门设置（Qt DoorSetting）：喇叭响应 index 15、
+ * 车门自动解锁 index 16（3 个选项循环）。
+ * 外部车门/单车门解锁/智能钥匙/选择解锁受工厂配置门控（缺省关闭），暂不迁移。
+ */
+typedef enum {
+    UI_SETTINGS_DOOR_HORN = 0,        /* 0x16 index 15 */
+    UI_SETTINGS_DOOR_AUTO_UNLOCK = 1, /* 0x16 index 16 */
+    UI_SETTINGS_DOOR_BACK = 2,        /* 返回 */
+    UI_SETTINGS_DOOR_COUNT = 3,
+} ui_settings_door_item_t;
+
 /* 我的座驾子项下标（固定清单，未迁移项置灰不可执行） */
 typedef enum {
     UI_SETTINGS_MYCAR_STYLE = 0,        /* 仪表风格 */
@@ -166,6 +206,9 @@ typedef struct {
     uint8_t it_index;      /* 行程资讯子项，0xFF = -1 */
     uint8_t assist_index;  /* 驾驶员辅助子项，0xFF = -1 */
     uint8_t driving_assist_index; /* 驾驶辅助三项，0xFF = -1 */
+    uint8_t vehicle_index;        /* 车辆设置子项，0xFF = -1 */
+    uint8_t light_index;          /* 灯光设置行，0xFF = -1 */
+    uint8_t door_index;           /* 车门设置行，0xFF = -1 */
     uint8_t speed_warn_digits[3]; /* 百/十/个位，运行期编辑缓冲 */
     uint8_t speed_warn_digit_index;
     uint8_t system_index;
@@ -206,6 +249,12 @@ typedef struct {
     lv_obj_t *assist_rows[UI_SETTINGS_ASSIST_COUNT];
     lv_obj_t *drv_assist_list;      /* 驾驶辅助：三项开关 + 返回 */
     lv_obj_t *drv_assist_rows[UI_SETTINGS_DA_COUNT];
+    lv_obj_t *vehicle_list;         /* 车辆设置：灯光/车门/返回 */
+    lv_obj_t *vehicle_rows[UI_SETTINGS_VEH_COUNT];
+    lv_obj_t *light_list;           /* 灯光设置：迎宾灯/室内自动点灯 + 返回 */
+    lv_obj_t *light_rows[UI_SETTINGS_LIGHT_COUNT];
+    lv_obj_t *door_list;            /* 车门设置：喇叭响应/自动解锁 + 返回 */
+    lv_obj_t *door_rows[UI_SETTINGS_DOOR_COUNT];
     lv_obj_t *speed_warn_list;
     lv_obj_t *system_list;
     lv_obj_t *system_rows[7];
@@ -267,6 +316,15 @@ void ui_settings_page_set_driver_assist(ui_settings_page_t *page,
                                         bool emergency,
                                         bool lane,
                                         bool blind);
+/*
+ * 车辆设置项的 MCU 回读值（ui_app 每次 apply 注入）。
+ * 设置页只显示回读值，OK 时取反下发 0x16，不本地翻转。
+ */
+void ui_settings_page_set_vehicle_settings(ui_settings_page_t *page,
+                                           bool welcome_light,
+                                           bool auto_interior_light,
+                                           bool horn_feedback,
+                                           uint8_t auto_door_unlock);
 void ui_settings_page_set_speed_warning(ui_settings_page_t *page, bool valid,
                                         uint8_t speed_kph);
 void ui_settings_page_set_version(ui_settings_page_t *page,

@@ -110,6 +110,11 @@ static bool map_key(const car_key_event_t *evt, ui_dispatch_ctx_t *ctx,
         if(in_settings) {
             return false;
         }
+        /*
+         * 逐条立即执行（Qt GlobalData.steeringKeySwitch），不折叠到批次结束，
+         * 保证同批 31 与方向键的相对顺序不变。
+         */
+        (void)ui_app_style_switch_next();
         ctx->style_switch = true;
         return false;
     case KEY_OK:
@@ -194,10 +199,6 @@ size_t car_ui_key_pump(car_link_t *link)
 
     forwarded = dispatch_events(count, &ctx);
 
-    /* 31：切换表盘样式，与 Qt 的 onSteeringKeySwitch 一致（只切样式） */
-    if(ctx.style_switch) {
-        (void)ui_app_next_style();
-    }
-
+    /* 31 已在 map_key 中逐条执行，这里不再按批次补切 */
     return forwarded;
 }

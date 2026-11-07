@@ -27,6 +27,19 @@ void car_state_init(car_state_t *state)
     state->driver_assist.lane_departure_warning = true;
     state->driver_assist.blind_spot_warning = true;
     state->driver_assist.valid = false;
+    /* Qt SettingsMgr 车辆设置项缺省：开关为 true，选项为 0 */
+    state->vehicle_setting.welcome_light = true;
+    state->vehicle_setting.auto_interior_light = true;
+    state->vehicle_setting.external_doors = true;
+    state->vehicle_setting.single_door_unlock = true;
+    state->vehicle_setting.horn_feedback = true;
+    state->vehicle_setting.auto_door_unlock = 0U;
+    state->vehicle_setting.smart_door_unlock = true;
+    state->vehicle_setting.select_unlock = true;
+    state->vehicle_setting.auto_door_lock = 0U;
+    state->vehicle_setting.headlight_sensitivity = 0U;
+    state->vehicle_setting.headlight_off_delay = 0U;
+    state->vehicle_setting.valid = false;
     /* Qt radaronoff 实为雷达开启，缺省 true；show4h 缺省 false */
     state->radar_on = true;
     state->show_4h = false;

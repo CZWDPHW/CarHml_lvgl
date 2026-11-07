@@ -499,6 +499,39 @@ void test_decode_suite(void)
         CHECK(st.driver_assist.valid);
     }
 
+    /* ---- 0x86 车辆设置回读：开关与选项 ---- */
+    {
+        const uint8_t welcome_on[3] = {0x86U, 0x4AU, 0x00U};   /* index 10 开 */
+        const uint8_t interior_off[3] = {0x86U, 0x0BU, 0x00U}; /* index 11 关 */
+        const uint8_t horn_off[3] = {0x86U, 0x0FU, 0x00U};     /* index 15 关 */
+        const uint8_t unlock_p[3] = {0x86U, 0x90U, 0x00U};     /* index 16 = 2 */
+        const uint8_t delay[3] = {0x86U, 0x00U, 0x51U};        /* control 1 = 5 */
+        const uint8_t sensitivity[3] = {0x86U, 0x00U, 0x32U};  /* control 2 = 3 */
+
+        car_state_init(&st);
+        CHECK(!st.vehicle_setting.valid);
+        CHECK(st.vehicle_setting.welcome_light); /* Qt 缺省 true */
+
+        CHECK(car_decode_high_func(welcome_on, 3, &st));
+        CHECK(st.vehicle_setting.valid);
+        CHECK(st.vehicle_setting.welcome_light);
+
+        CHECK(car_decode_high_func(interior_off, 3, &st));
+        CHECK(!st.vehicle_setting.auto_interior_light);
+
+        CHECK(car_decode_high_func(horn_off, 3, &st));
+        CHECK(!st.vehicle_setting.horn_feedback);
+
+        CHECK(car_decode_high_func(unlock_p, 3, &st));
+        CHECK(st.vehicle_setting.auto_door_unlock == 2U);
+
+        CHECK(car_decode_high_func(delay, 3, &st));
+        CHECK(st.vehicle_setting.headlight_off_delay == 5U);
+
+        CHECK(car_decode_high_func(sensitivity, 3, &st));
+        CHECK(st.vehicle_setting.headlight_sensitivity == 3U);
+    }
+
     /* ---- 长度不足一律拒收 ---- */
     {
         const uint8_t zero[16] = {0};

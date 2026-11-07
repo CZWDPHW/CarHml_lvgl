@@ -106,6 +106,17 @@ bool car_cmd_set_light(car_cmd_t *req, car_light_setting_t setting, int value);
  */
 bool car_cmd_set_driver_assist(car_cmd_t *req, uint8_t index, bool on);
 
+/*
+ * 车辆设置项（Qt SerialComManmager::sendLightset）：
+ *   index 1~31，payload [0x86, (status << 6) | index, 0]；
+ *   control 1 = 灯光关闭延时（index 32，status 0~7），
+ *   control 2 = 点灯灵敏度（index 33，status 0~3），payload [0x86, 0, val]。
+ * 真实状态以 MCU 0x16 Status 回读为准。
+ */
+bool car_cmd_set_vehicle_setting(car_cmd_t *req, uint8_t index, uint8_t status);
+bool car_cmd_set_vehicle_setting_ext(car_cmd_t *req, uint8_t control,
+                                     uint8_t status);
+
 bool car_cmd_send_debug(car_cmd_t *req, uint8_t id, uint8_t action, uint8_t num);
 
 #ifdef __cplusplus

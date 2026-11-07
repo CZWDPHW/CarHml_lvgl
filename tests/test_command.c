@@ -93,6 +93,36 @@ void test_command_suite(void)
           (uint8_t)((3U << 6) | (2U << 4) | (1U << 3) | (1U << 2) | (0U << 1) |
                     1U));
 
+    /* ---- 0x16/0x86 车辆设置（Qt sendLightset） ---- */
+    CHECK(car_cmd_set_vehicle_setting(&req, 10U, 1U));
+    CHECK(req.cmd_id == 0x16);
+    CHECK(req.op == CAR_OP_SET_GET);
+    CHECK(req.len == 3);
+    CHECK(req.payload[0] == 0x86);
+    CHECK(req.payload[1] == (uint8_t)((1U << 6) | 10U));
+    CHECK(req.payload[2] == 0x00);
+
+    CHECK(car_cmd_set_vehicle_setting(&req, 15U, 0U));
+    CHECK(req.payload[1] == 0x0F);
+
+    CHECK(car_cmd_set_vehicle_setting(&req, 16U, 2U));
+    CHECK(req.payload[1] == (uint8_t)((2U << 6) | 16U));
+
+    CHECK(!car_cmd_set_vehicle_setting(&req, 0U, 1U));
+    CHECK(!car_cmd_set_vehicle_setting(&req, 32U, 1U));
+
+    /* 扩展 ack：control 1 = 灯光关闭延时，control 2 = 点灯灵敏度 */
+    CHECK(car_cmd_set_vehicle_setting_ext(&req, 1U, 5U));
+    CHECK(req.cmd_id == 0x16 && req.len == 3);
+    CHECK(req.payload[0] == 0x86 && req.payload[1] == 0x00);
+    CHECK(req.payload[2] == (uint8_t)((5U << 4) | 1U));
+
+    CHECK(car_cmd_set_vehicle_setting_ext(&req, 2U, 3U));
+    CHECK(req.payload[2] == (uint8_t)((3U << 4) | 2U));
+
+    CHECK(!car_cmd_set_vehicle_setting_ext(&req, 0U, 1U));
+    CHECK(!car_cmd_set_vehicle_setting_ext(&req, 3U, 1U));
+
     /* ---- 载荷上限 ---- */
     {
         uint8_t big[CAR_CMD_PAYLOAD_MAX + 1];

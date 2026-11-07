@@ -28,20 +28,24 @@
 extern "C" {
 #endif
 
-/* 分发上下文：记录本轮按键引发的动作，供调用方执行 */
+/*
+ * 分发上下文：记录本轮按键引发的动作。
+ * nav_home 由调用方执行；style_switch 仅作观测标记，
+ * 31 的实际切盘已在分发过程中逐条执行。
+ */
 typedef struct {
     bool nav_home;     /* 收到 13：返回首页 */
-    bool style_switch; /* 收到 31：切换表盘样式 */
+    bool style_switch; /* 收到 31：本轮已执行切盘 */
 } ui_dispatch_ctx_t;
 
 /*
  * 取出链路按键队列并逐条映射到界面。
- * 返回本次处理的按键条数；ctx 里的动作由调用方执行。
+ * 返回本次处理的按键条数；ctx.nav_home 由调用方执行。
  */
 size_t car_ui_key_dispatch(car_link_t *link, ui_dispatch_ctx_t *ctx);
 
 /*
- * 板端入口：取出按键、转发翻卡按键，并在收到 31 时切换表盘样式。
+ * 板端入口：取出按键并逐条转发（31 在内部按当前车型合法样式切换）。
  * 返回转发给界面的按键条数。
  */
 size_t car_ui_key_pump(car_link_t *link);

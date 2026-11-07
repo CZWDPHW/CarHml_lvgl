@@ -45,8 +45,13 @@
 #if defined(CARMW_PLATFORM_BOARD)
 #define SERIAL_DEVICE "/dev/ttyS2"
 #define SERIAL_BAUD 115200
+#define PERF_REPORT_MS 2000U
 
 static car_port_posix_t s_posix;
+static uint64_t s_perf_window_start_ms;
+static uint32_t s_perf_handler_count;
+static uint64_t s_perf_handler_total_us;
+static uint64_t s_perf_handler_max_us;
 static volatile sig_atomic_t s_quit;
 
 static void on_quit_signal(int signo)
@@ -107,16 +112,25 @@ static bool settings_pending(void)
 }
 #endif
 
-/* 启动样式取持久设置；设置里的 id 在注册表中不存在时回落到 forester1 */
+/*
+ * 启动样式取持久设置；仅接受当前车型的可用样式。
+ * 旧配置里的占位样式（general1）或未知 id 回落到默认样式。
+ */
 static const char *settings_start_style(void)
 {
-    const char *id = s_settings.values.dial_style;
+    const ui_style_desc_t *desc = ui_style_find(s_settings.values.dial_style);
+    const ui_style_desc_t *def = ui_style_default();
 
-    if(id[0] == '\0' || ui_style_find(id) == NULL) {
+    if(def == NULL) {
         return "forester1";
     }
 
-    return id;
+    if(desc == NULL || !desc->available ||
+       strcmp(desc->vehicle, def->vehicle) != 0) {
+        return def->id;
+    }
+
+    return desc->id;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1069,11 +1083,66 @@ static void style_button_create(void)
 }
 #endif
 
+#if defined(CARMW_PLATFORM_BOARD)
+static uint64_t perf_now_us(void)
+{
+    struct timespec now;
+
+    (void)clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000000ULL + (uint64_t)now.tv_nsec / 1000ULL;
+}
+
+static void perf_report(uint64_t now_ms)
+{
+    uint64_t elapsed_ms;
+
+    if(s_perf_window_start_ms == 0U) {
+        s_perf_window_start_ms = now_ms;
+        return;
+    }
+
+    elapsed_ms = now_ms - s_perf_window_start_ms;
+    if(elapsed_ms < PERF_REPORT_MS) {
+        return;
+    }
+
+    fprintf(stderr, "perf: handler=%u fps=%.1f avg=%lluus max=%lluus window=%llums\n",
+            (unsigned)s_perf_handler_count,
+            (double)s_perf_handler_count * 1000.0 / (double)elapsed_ms,
+            (unsigned long long)(s_perf_handler_count != 0U ?
+                                 s_perf_handler_total_us / s_perf_handler_count : 0U),
+            (unsigned long long)s_perf_handler_max_us,
+            (unsigned long long)elapsed_ms);
+    s_perf_window_start_ms = now_ms;
+    s_perf_handler_count = 0U;
+    s_perf_handler_total_us = 0U;
+    s_perf_handler_max_us = 0U;
+}
+#endif
+
 static void ui_loop(void)
 {
     while(!ui_should_quit()) {
-        uint32_t idle = lv_timer_handler();
+        uint32_t idle;
         struct timespec delay;
+#if defined(CARMW_PLATFORM_BOARD)
+        uint64_t handler_start = perf_now_us();
+#endif
+
+        idle = lv_timer_handler();
+#if defined(CARMW_PLATFORM_BOARD)
+        {
+            uint64_t handler_us = perf_now_us() - handler_start;
+            uint64_t now_ms = handler_start / 1000U;
+
+            s_perf_handler_count++;
+            s_perf_handler_total_us += handler_us;
+            if(handler_us > s_perf_handler_max_us) {
+                s_perf_handler_max_us = handler_us;
+            }
+            perf_report(now_ms);
+        }
+#endif
 
 #if !defined(CARMW_PLATFORM_BOARD)
         if(g_snapshot_requested != 0) {
