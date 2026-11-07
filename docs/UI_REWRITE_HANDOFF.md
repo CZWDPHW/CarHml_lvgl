@@ -2197,7 +2197,13 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
   - 设置页/媒体页遮挡通用提示（Qt `visible: !settingsPageOpen && !ismedia`）：`ov_tips` 新增 `obstructed` 状态与 `ov_tips_set_obstructed()`；`page_subaru_forester1.c` 用 `ui_app_settings_is_open()`（对齐 Qt 的 settingsPageOpen，而非按车速隐藏后的可见性）与当前中心卡是否为多媒体卡（`ismedia`）合并判定。遮挡只隐藏通用提示面板，燃油低横幅与 P 挡提示条不受影响；遮挡期间播放队列与 2s 计时照常推进，解除后继续显示当前条目。
   - 设置页打开时遮挡覆盖层（Qt `main.qml`：车门 `visible: settingsPageOpen ? false : doorPageOpen`、胎压 `!settingsPageOpen`、雷达 `(doorPageOpen || settingsPageOpen) ? false : pageRadarOpen`、中心内容 `contentShow` 排除 `settingsPageOpen`）：`ov_door_apply()` 新增 `suppressed` 参数（门状态位照常记录，解除后恢复），`ov_tire_apply()`/`ov_radar_apply()` 的 suppressed 条件加入 `settings_open`，中心卡片在设置页打开时隐藏；定速巡航不受设置页影响（与 Qt 一致）。
   - 测试补充：`test_overlays` 增加 `ui_app_set_carplay_active()` 雷达隐藏/恢复用例，以及 `ov_tips_set_obstructed()` 遮挡时面板隐藏但计时继续、解除后恢复显示用例；覆盖层组合用例加入 `ui_app_settings_open()` 车门/雷达/中心内容隐藏与关闭后恢复断言。`cmake --build build -j8` 通过，`ctest` 6/6 通过（overlays 842 checks / 0 failure）；`cmake --build build_board -j8` 通过。
-- **下一步**：14.8 剩余项为底部灯排的紧急制动/盲区/LDA 设置驱动灯（当前只完成右表盘 4H 灯门控）；真实 CarPlay 会话状态需等 6.6 拿到 ZLink SDK 后替换演示标志。
+  - **底部灯排三项设置驱动灯（对齐 Qt `Image/` 与 QML 源码）**：Qt 侧这三盏灯不是故障码驱动，而是 `IconGeneral` 白/黄两层叠加，因此未作为普通码位接入 `car_state_warning_level`。
+    - `ui_lamp_group.h` 新增门控 `UI_LAMP_GATE_EMERGENCY_BRAKING` / `UI_LAMP_GATE_BLIND_SPOT` / `UI_LAMP_GATE_LANE_DEPARTURE`；`ui_lamp_group.c` 对这些门控走独立分支：开关（`car_state_t.driver_assist`，0x16 回读）关闭时整盏熄灭，打开时常亮，并按 `high_func.lane` 选择图标（variant 0 白图 / variant 1 黄图）。
+    - Qt 对应关系：紧急制动 `jin_w` 常显 + `jin_y` 在 `showcar > 0`；盲区 `hide_w`(`BSD_w.png`) + `hide_y`(`BSD_y.png`) 在 `showarea > 0`；车道偏离 `lda_w`(`real_road_w_n.png`) + `lda_y`(`real_road_y_n.png`) 在 `carState > 1`。注意 Qt `ResourceLib.qml` 的 `jin_y` 实际指向 `jin_w.png`，原工程即如此，迁移未擅自改色。
+    - 未收到 0x0E 时 `lane` 字段为 0，只显示白图（与 Qt 初始状态一致）；`ui_lamp_group_apply()` 对门控灯按 `active` 差值重设图标，不会每帧重载。
+    - 位置按 Qt Row 顺序累加：紧急制动 (828,630)、盲区 (886,630)、车道偏离 (944,630)，均 58×58；陡坡缓降仍在 (1052,633)。
+    - 测试：`test_overlays` 新增 `test_assist_lamp_gates()`，覆盖缺省白图、三项转黄图、状态清零回白、开关关闭熄灭及单项重开。`cmake --build build -j8` 通过，`ctest` 6/6 通过；`cmake --build build_board -j8` 通过；PC 模拟运行无 PNG 解码警告。
+- **下一步**：14.8 剩余项为底部灯排的 XMode/Set 灯位；真实 CarPlay 会话状态需等 6.6 拿到 ZLink SDK 后替换演示标志。
 
 ### 14.9 步骤6.5：车型风格与车辆设置命令闭环
 

@@ -34,10 +34,17 @@ typedef struct {
     uint8_t code2;
 } ui_lamp_group_variant_t;
 
-/* 单灯的可见性门控来源（样式层按 Qt 的 visible 表达式选择） */
+/*
+ * 单灯的可见性门控来源（样式层按 Qt 的 visible 表达式选择）。
+ * 驾驶辅助三项的门控同时决定图标：开关关闭整盏灯熄灭；开关打开时按
+ * car_high_func.lane 的实时状态决定白/黄图标（Qt 底排 jin/BSD/real_road）。
+ */
 typedef enum {
     UI_LAMP_GATE_NONE = 0,
-    UI_LAMP_GATE_SHOW_4H, /* 仅 state->show_4h 为真时允许点亮（Qt show4h） */
+    UI_LAMP_GATE_SHOW_4H,           /* 仅 state->show_4h 为真时允许点亮（Qt show4h） */
+    UI_LAMP_GATE_EMERGENCY_BRAKING, /* Qt emergencyBraking，黄图条件 showcar > 0 */
+    UI_LAMP_GATE_BLIND_SPOT,        /* Qt blindSpotWarning，黄图条件 showarea > 0 */
+    UI_LAMP_GATE_LANE_DEPARTURE,    /* Qt laneDepartureWarning，黄图条件 carState > 1 */
 } ui_lamp_gate_t;
 
 /* 样式层提供的单灯配置：绝对坐标 + 图标变体表 */

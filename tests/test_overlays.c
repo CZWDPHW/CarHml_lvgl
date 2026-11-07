@@ -1423,6 +1423,88 @@ static void test_driver_assist_gates(lv_obj_t *parent)
     ov_cruise_destroy(&ov);
 }
 
+/*
+ * 14.8：底部灯排三项（Qt PageSubaruForester1 的 jin / hide(BSD) / lda(real_road)）。
+ * 设置门控关灯，门控打开时按 0x0E 车道辅助状态切白/黄图标。
+ */
+static const ui_lamp_group_item_t s_assist_lamp_items[] = {
+    { .variants = {{"WarnIcon/jin_w.png", 0U, 0U}, {"WarnIcon/jin_y.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_EMERGENCY_BRAKING,
+      .x = 0, .y = 0, .w = 58, .h = 58 },
+    { .variants = {{"WarnIcon/BSD_w.png", 0U, 0U}, {"WarnIcon/BSD_y.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_BLIND_SPOT,
+      .x = 58, .y = 0, .w = 58, .h = 58 },
+    { .variants = {{"WarnIcon/real_road_w_n.png", 0U, 0U},
+                   {"WarnIcon/real_road_y_n.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_LANE_DEPARTURE,
+      .x = 116, .y = 0, .w = 58, .h = 58 },
+};
+
+/* 断言当前图标为白图（variant 0）或黄图（variant 1） */
+static void check_assist_icon(ui_lamp_group_t *group, uint8_t index, int8_t variant)
+{
+    CHECK(group->items[index].active == variant);
+    CHECK(lv_image_get_src(group->items[index].lamp.img) ==
+          &group->items[index].dsc[variant]);
+}
+
+static void test_assist_lamp_gates(lv_obj_t *screen)
+{
+    const uint8_t all_on[7] = {0x0E, 0, 0, 0, 2, 3, 1};
+    const uint8_t lane_c0[7] = {0x0E, 0, 0, 0, 0, 0, 0};
+    car_state_t st;
+    ui_lamp_group_t group = {0};
+    lv_obj_t *holder = lv_obj_create(screen);
+
+    car_state_init(&st);
+    CHECK(ui_lamp_group_create(&group, holder, s_assist_lamp_items,
+                               (uint8_t)(sizeof(s_assist_lamp_items) /
+                                         sizeof(s_assist_lamp_items[0]))));
+
+    /* 三项开关缺省全开，未收到 0x0E 时只显示白图 */
+    CHECK(st.driver_assist.emergency_braking);
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_ON);
+    check_group_state(&group, 1U, UI_LAMP_ON);
+    check_group_state(&group, 2U, UI_LAMP_ON);
+    check_assist_icon(&group, 0U, 0);
+    check_assist_icon(&group, 1U, 0);
+    check_assist_icon(&group, 2U, 0);
+
+    /* showCar>0 / showArea>0 / carState=2：三项都切黄图 */
+    CHECK(car_decode_high_func(all_on, sizeof(all_on), &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_ON);
+    check_assist_icon(&group, 0U, 1);
+    check_assist_icon(&group, 1U, 1);
+    check_assist_icon(&group, 2U, 1);
+
+    /* 车道辅助状态清零：回到白图，灯保持点亮 */
+    CHECK(car_decode_high_func(lane_c0, sizeof(lane_c0), &st));
+    ui_lamp_group_apply(&group, &st);
+    check_assist_icon(&group, 0U, 0);
+    check_assist_icon(&group, 1U, 0);
+    check_assist_icon(&group, 2U, 0);
+
+    /* 关闭设置项：整盏灯熄灭，不因车况存在而点亮 */
+    st.driver_assist.emergency_braking = false;
+    st.driver_assist.blind_spot_warning = false;
+    st.driver_assist.lane_departure_warning = false;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_OFF);
+    check_group_state(&group, 1U, UI_LAMP_OFF);
+    check_group_state(&group, 2U, UI_LAMP_OFF);
+
+    /* 只重开盲区：仅第二盏恢复点亮 */
+    st.driver_assist.blind_spot_warning = true;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_OFF);
+    check_group_state(&group, 1U, UI_LAMP_ON);
+    check_group_state(&group, 2U, UI_LAMP_OFF);
+
+    lv_obj_delete(holder);
+}
+
 /* LVGL 内部把旋转角归一化到 0~3600，这里还原成带符号的 0.1° 便于断言 */
 static int32_t needle_rot(lv_obj_t *needle)
 {
@@ -1920,6 +2002,7 @@ int main(void)
     test_lamp_4h_gate(lv_screen_active());
     test_lamp_blink(lv_screen_active());
     test_cruise(lv_screen_active());
+    test_assist_lamp_gates(lv_screen_active());
     test_driver_assist_gates(lv_screen_active());
     test_speed_units(lv_screen_active());
     test_range_units(lv_screen_active());

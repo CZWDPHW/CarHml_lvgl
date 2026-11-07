@@ -301,7 +301,7 @@ static const ui_lamp_group_item_t s_right_lamp_items[] = {
 
 /*
  * 底部灯排（Qt Row 位于 660,630）
- * 坐标按 Qt 子项宽度依次累加；暂未接入设置项驱动的紧急制动/盲区/LDA/XMode/Set。
+ * 坐标按 Qt 子项宽度依次累加；XMode/Set 仍未迁移。
  */
 static ui_lamp_group_t s_bottom_lamps;
 
@@ -321,6 +321,27 @@ static const ui_lamp_group_item_t s_bottom_lamp_items[] = {
     /* 智能怠速正在工作 (52×52) ，码 26 */
     { .variants = {{"WarnIcon/26.png", 26U, 0U}}, .variant_count = 1,
       .x = 776, .y = 630, .w = 52, .h = 52 },
+
+    /*
+     * 紧急制动 (828,630) 58×58：Qt jinw/jiny，白图常显（受 emergencyBraking 门控），
+     * 黄图在 showcar > 0 时覆盖白图。
+     */
+    { .variants = {{"WarnIcon/jin_w.png", 0U, 0U},
+                   {"WarnIcon/jin_y.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_EMERGENCY_BRAKING,
+      .x = 828, .y = 630, .w = 58, .h = 58 },
+
+    /* 盲区检测 (886,630) 58×58：Qt hidew/hidey（BSD），黄图在 showarea > 0 时显示 */
+    { .variants = {{"WarnIcon/BSD_w.png", 0U, 0U},
+                   {"WarnIcon/BSD_y.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_BLIND_SPOT,
+      .x = 886, .y = 630, .w = 58, .h = 58 },
+
+    /* 车道偏离开关 (944,630) 58×58：Qt ldaw/lday（real_road），黄图在 carState > 1 时显示 */
+    { .variants = {{"WarnIcon/real_road_w_n.png", 0U, 0U},
+                   {"WarnIcon/real_road_y_n.png", 0U, 0U}},
+      .variant_count = 2, .gate = UI_LAMP_GATE_LANE_DEPARTURE,
+      .x = 944, .y = 630, .w = 58, .h = 58 },
 
     /* 陡坡缓降 (58×58，行内垂直居中) ，码 30 / 94 */
     { .variants = {{"WarnIcon/steep_y.png", 30U, 94U}}, .variant_count = 1,

@@ -36,6 +36,52 @@ static void lamp_apply_level(ui_lamp_t *lamp, uint8_t level)
     }
 }
 
+/*
+ * 驾驶辅助三项灯：Qt 用两张互相重叠的 IconGeneral 表达白/黄，
+ * 黄图仅在开关打开且对应车道辅助状态满足时显示，其余情况显示白图。
+ * 返回 -1 表示设置开关关闭、整盏灯熄灭；否则返回应使用的图标下标。
+ */
+static int8_t assist_lamp_variant(const ui_lamp_group_item_t *cfg,
+                                  const car_state_t *state, uint8_t *level)
+{
+    const car_lane_assist_t *lane = &state->high_func.lane;
+    bool enabled = false;
+    bool highlight = false;
+
+    switch((ui_lamp_gate_t)cfg->gate) {
+    case UI_LAMP_GATE_EMERGENCY_BRAKING:
+        enabled = state->driver_assist.emergency_braking;
+        highlight = lane->show_car > 0U;
+        break;
+
+    case UI_LAMP_GATE_BLIND_SPOT:
+        enabled = state->driver_assist.blind_spot_warning;
+        highlight = lane->show_area > 0U;
+        break;
+
+    case UI_LAMP_GATE_LANE_DEPARTURE:
+        enabled = state->driver_assist.lane_departure_warning;
+        highlight = lane->car_state > 1U;
+        break;
+
+    default:
+        break;
+    }
+
+    if(!enabled) {
+        return -1;
+    }
+
+    /* 未收到 0x0E 时 lane 字段都还是 0，与 Qt 相同只显示白图 */
+    *level = (uint8_t)CAR_WARN_ON;
+
+    if(highlight && cfg->variant_count > 1U) {
+        return 1;
+    }
+
+    return 0;
+}
+
 bool ui_lamp_group_create(ui_lamp_group_t *group, lv_obj_t *parent,
                           const ui_lamp_group_item_t *items, uint8_t count)
 {
@@ -83,6 +129,26 @@ void ui_lamp_group_apply(ui_lamp_group_t *group, const car_state_t *state)
         ui_lamp_group_item_rt_t *rt = &group->items[i];
         int8_t best = -1;
         uint8_t best_level = 0;
+
+        if(cfg->gate >= (uint8_t)UI_LAMP_GATE_EMERGENCY_BRAKING &&
+           cfg->gate <= (uint8_t)UI_LAMP_GATE_LANE_DEPARTURE) {
+            int8_t idx = assist_lamp_variant(cfg, state, &best_level);
+
+            if(idx < 0) {
+                best_level = 0U;
+            }
+            else {
+                best = idx;
+            }
+
+            if(best >= 0 && rt->active != best) {
+                rt->active = best;
+                ui_lamp_set_icon(&rt->lamp, &rt->dsc[best]);
+            }
+
+            lamp_apply_level(&rt->lamp, best_level);
+            continue;
+        }
 
         for(uint8_t v = 0; v < cfg->variant_count; ++v) {
             uint8_t level = car_state_warning_level(state,
