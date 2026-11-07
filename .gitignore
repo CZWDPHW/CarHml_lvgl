@@ -1,0 +1,9 @@
+build/
+build_*/
+bin/
+Testing/
+.cache/
+assets/bin16/
+assets/bin32/
+*.o
+*.a

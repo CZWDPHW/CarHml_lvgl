@@ -1,0 +1,44 @@
+<svg width="268" height="288" viewBox="0 0 268 288" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 3926">
+<g id="Rectangle 6424" filter="url(#filter0_d_682_223)">
+<rect x="4" y="4" width="260" height="280" fill="#060708"/>
+<rect x="4.5" y="4.5" width="259" height="279" stroke="#FFFDCA"/>
+</g>
+<g id="Group 3920">
+<path id="Rectangle 6425" d="M0 0H4V32L0 26.6667V0Z" fill="#FFFDCA"/>
+<path id="Rectangle 6426" d="M20 0L24 4L-1.74846e-07 4L0 -1.04907e-06L20 0Z" fill="#FFFDCA"/>
+<path id="Rectangle 6427" d="M38 -1.74846e-07L42 4L30 4L26 -6.99382e-07L38 -1.74846e-07Z" fill="#FFFDCA"/>
+<path id="Rectangle 6428" d="M56 -1.74846e-07L60 4L48 4L44 -6.99382e-07L56 -1.74846e-07Z" fill="#FFFDCA"/>
+</g>
+<g id="Group 3922">
+<path id="Rectangle 6425_2" d="M0 288H4V256L0 261.333V288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6426_2" d="M20 288L24 284L-1.74846e-07 284L0 288L20 288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6427_2" d="M38 288L42 284L30 284L26 288L38 288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6428_2" d="M56 288L60 284L48 284L44 288L56 288Z" fill="#FFFDCA"/>
+</g>
+<g id="Group 3921">
+<path id="Rectangle 6425_3" d="M268 0H264V32L268 26.6667V0Z" fill="#FFFDCA"/>
+<path id="Rectangle 6426_3" d="M248 0L244 4L268 4L268 -1.04907e-06L248 0Z" fill="#FFFDCA"/>
+<path id="Rectangle 6427_3" d="M230 -1.74846e-07L226 4L238 4L242 -6.99382e-07L230 -1.74846e-07Z" fill="#FFFDCA"/>
+<path id="Rectangle 6428_3" d="M212 -1.74846e-07L208 4L220 4L224 -6.99382e-07L212 -1.74846e-07Z" fill="#FFFDCA"/>
+</g>
+<g id="Group 3923">
+<path id="Rectangle 6425_4" d="M268 288H264V256L268 261.333V288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6426_4" d="M248 288L244 284L268 284L268 288L248 288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6427_4" d="M230 288L226 284L238 284L242 288L230 288Z" fill="#FFFDCA"/>
+<path id="Rectangle 6428_4" d="M212 288L208 284L220 284L224 288L212 288Z" fill="#FFFDCA"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_d_682_223" x="-20" y="-16" width="308" height="328" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="12"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.8 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_682_223"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_682_223" result="shape"/>
+</filter>
+</defs>
+</svg>
