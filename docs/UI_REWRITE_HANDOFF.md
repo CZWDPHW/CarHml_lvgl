@@ -2201,9 +2201,14 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
     - `ui_lamp_group.h` 新增门控 `UI_LAMP_GATE_EMERGENCY_BRAKING` / `UI_LAMP_GATE_BLIND_SPOT` / `UI_LAMP_GATE_LANE_DEPARTURE`；`ui_lamp_group.c` 对这些门控走独立分支：开关（`car_state_t.driver_assist`，0x16 回读）关闭时整盏熄灭，打开时常亮，并按 `high_func.lane` 选择图标（variant 0 白图 / variant 1 黄图）。
     - Qt 对应关系：紧急制动 `jin_w` 常显 + `jin_y` 在 `showcar > 0`；盲区 `hide_w`(`BSD_w.png`) + `hide_y`(`BSD_y.png`) 在 `showarea > 0`；车道偏离 `lda_w`(`real_road_w_n.png`) + `lda_y`(`real_road_y_n.png`) 在 `carState > 1`。注意 Qt `ResourceLib.qml` 的 `jin_y` 实际指向 `jin_w.png`，原工程即如此，迁移未擅自改色。
     - 未收到 0x0E 时 `lane` 字段为 0，只显示白图（与 Qt 初始状态一致）；`ui_lamp_group_apply()` 对门控灯按 `active` 差值重设图标，不会每帧重载。
-    - 位置按 Qt Row 顺序累加：紧急制动 (828,630)、盲区 (886,630)、车道偏离 (944,630)，均 58×58；陡坡缓降仍在 (1052,633)。
+    - 位置按 Qt Row 顺序累加：紧急制动 (828,630)、盲区 (886,630)、车道偏离 (944,630)，均 58×58；陡坡缓降位置见下方 XMode/Set 记录（已顺移到 1066）。
     - 测试：`test_overlays` 新增 `test_assist_lamp_gates()`，覆盖缺省白图、三项转黄图、状态清零回白、开关关闭熄灭及单项重开。`cmake --build build -j8` 通过，`ctest` 6/6 通过；`cmake --build build_board -j8` 通过；PC 模拟运行无 PNG 解码警告。
-- **下一步**：14.8 剩余项为底部灯排的 XMode/Set 灯位；真实 CarPlay 会话状态需等 6.6 拿到 ZLink SDK 后替换演示标志。
+  - **底部灯排 XMode / Set（14.8 收尾）**：
+    - XMode：`ui_lamp_group.h` 新增 `UI_LAMP_GATE_XMODE`。数据用 `car_state_t.drive_mode`（0x19，与 Qt 0x86 `DriveModeSelection` 的 `data[1]` 等价）；`drive_mode_valid` 为假时一律熄灭，避免结构体残留值误发光。6/7/8 依次对应 `xmode_w/snow/deepsnow`（Qt `ResourceLib.warnlight.xmode_w/xmode_s/xmode_ds`），其余模式熄灭。灯位 (1002,630) 64×64。
+    - Set：Qt 是白底圆角 + 加粗 `set` 文本的 `Rectangle`，不是图片，因此页面单独创建 `ui->set_badge`（64×36 @ (1066,644)，白底、圆角 6、`lv_font_montserrat_28`），按 `cruise.cruise_state` bit1（Qt `speedok`）显隐，只在状态变化时改标志位。灯组里同时保留 `UI_LAMP_GATE_SPEED_SET_OK` 供其他样式复用。
+    - 陡坡缓降随之顺移：Qt 底排顺序为 …占位 50 → XMode 64 → Set 64 → 陡坡 58，因此陡坡由 (1052,633) 改为 (1066,633)。
+    - 测试：`test_assist_lamp_gates()` 扩展 XMode 的“无有效帧熄灭 / 6→7→8 换图 / 非 3 档熄灭 / 熄后保留图标”与 Set 的 bit1 显隐；另断言陡坡码 30 不受影响。PC/BOARD 构建通过，CTest 6/6，模拟运行无 PNG 警告。
+- **下一步**：真实 CarPlay 会话状态需等 6.6 拿到 ZLink SDK 后替换演示标志；14.8 灯位部分已全部接线。
 
 ### 14.9 步骤6.5：车型风格与车辆设置命令闭环
 

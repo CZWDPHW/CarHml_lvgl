@@ -1438,6 +1438,18 @@ static const ui_lamp_group_item_t s_assist_lamp_items[] = {
                    {"WarnIcon/real_road_y_n.png", 0U, 0U}},
       .variant_count = 2, .gate = UI_LAMP_GATE_LANE_DEPARTURE,
       .x = 116, .y = 0, .w = 58, .h = 58 },
+    /* 14.8 收尾：XMode / Set 两个设置驱动灯位 */
+    { .variants = {{"WarnIcon/xmode_w.png", 0U, 0U},
+                   {"WarnIcon/snow.png", 0U, 0U},
+                   {"WarnIcon/deepsnow.png", 0U, 0U}},
+      .variant_count = 3, .gate = UI_LAMP_GATE_XMODE,
+      .x = 174, .y = 0, .w = 64, .h = 64 },
+    { .variants = {{"WarnIcon/steep_y.png", 30U, 94U}}, .variant_count = 1,
+      .x = 238, .y = 0, .w = 58, .h = 58 },
+    /* Set 徽标在页面里是文本对象，这里仅借一张图验证 bit1 门控逻辑 */
+    { .variants = {{"WarnIcon/xmode_w.png", 0U, 0U}}, .variant_count = 1,
+      .gate = UI_LAMP_GATE_SPEED_SET_OK,
+      .x = 296, .y = 0, .w = 64, .h = 36 },
 };
 
 /* 断言当前图标为白图（variant 0）或黄图（variant 1） */
@@ -1452,6 +1464,7 @@ static void test_assist_lamp_gates(lv_obj_t *screen)
 {
     const uint8_t all_on[7] = {0x0E, 0, 0, 0, 2, 3, 1};
     const uint8_t lane_c0[7] = {0x0E, 0, 0, 0, 0, 0, 0};
+    const uint8_t warn_all_on[1] = {1U}; /* 全局 ON，与 C3 用例的 global_on 一致 */
     car_state_t st;
     ui_lamp_group_t group = {0};
     lv_obj_t *holder = lv_obj_create(screen);
@@ -1501,6 +1514,50 @@ static void test_assist_lamp_gates(lv_obj_t *screen)
     check_group_state(&group, 0U, UI_LAMP_OFF);
     check_group_state(&group, 1U, UI_LAMP_ON);
     check_group_state(&group, 2U, UI_LAMP_OFF);
+
+    /*
+     * XMode（下标 3）：无 0x19 帧时统一熄灭，即使结构体里的 drive_mode 恰好是 6；
+     * 有效后 6/7/8 依次对应 xmode_w/snow/deepsnow，其余模式熄灭。
+     */
+    CHECK(group.items[3].active == -1);
+    st.drive_mode = 6U;
+    st.drive_mode_valid = false;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 3U, UI_LAMP_OFF);
+
+    st.drive_mode_valid = true;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 3U, UI_LAMP_ON);
+    check_assist_icon(&group, 3U, 0);
+
+    st.drive_mode = 7U;
+    ui_lamp_group_apply(&group, &st);
+    check_assist_icon(&group, 3U, 1);
+
+    st.drive_mode = 8U;
+    ui_lamp_group_apply(&group, &st);
+    check_assist_icon(&group, 3U, 2);
+
+    st.drive_mode = 5U;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 3U, UI_LAMP_OFF);
+    /* 熄灭后保留最后一张图，避免下帧重复换图 */
+    CHECK(group.items[3].active == 2);
+
+    /* 陡坡缓降（下标 4）本不该受改动影响：码 30 点亮 */
+    CHECK(car_decode_warnings(warn_all_on, 1, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 4U, UI_LAMP_ON);
+
+    /* Set 门控（下标 5）：cruise_state bit1 决定显隐，不受警示帧影响 */
+    CHECK(group.items[5].active == -1);
+    check_group_state(&group, 5U, UI_LAMP_OFF);
+    st.cruise.cruise_state = 0x02U;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 5U, UI_LAMP_ON);
+    st.cruise.cruise_state = 0x01U; /* 仅 controlLed，speedok 关闭 */
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 5U, UI_LAMP_OFF);
 
     lv_obj_delete(holder);
 }

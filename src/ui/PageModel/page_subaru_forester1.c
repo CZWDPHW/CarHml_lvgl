@@ -112,6 +112,10 @@ typedef struct {
     /* ECO 指示图标：Qt IconGeneral(350,380) 在左表盘容器内，无故障码 */
     lv_obj_t *eco_lamp;
 
+    /* Set 徽标：Qt IconSet，白底圆角 + "set"，由 cruise_state bit1 控制显隐 */
+    lv_obj_t *set_badge;
+    bool set_badge_shown;
+
     /* 覆盖层：创建在页面最上层，任一激活时隐藏中心卡片容器 */
     ov_door_t ov_door;
     ov_tire_t ov_tire;
@@ -343,9 +347,16 @@ static const ui_lamp_group_item_t s_bottom_lamp_items[] = {
       .variant_count = 2, .gate = UI_LAMP_GATE_LANE_DEPARTURE,
       .x = 944, .y = 630, .w = 58, .h = 58 },
 
+    /* XMode (1002,630) 64×64：Qt IconXMode，drive_mode 6/7/8 → xmode_w/snow/deepsnow */
+    { .variants = {{"WarnIcon/xmode_w.png", 0U, 0U},
+                   {"WarnIcon/snow.png", 0U, 0U},
+                   {"WarnIcon/deepsnow.png", 0U, 0U}},
+      .variant_count = 3, .gate = UI_LAMP_GATE_XMODE,
+      .x = 1002, .y = 630, .w = 64, .h = 64 },
+
     /* 陡坡缓降 (58×58，行内垂直居中) ，码 30 / 94 */
     { .variants = {{"WarnIcon/steep_y.png", 30U, 94U}}, .variant_count = 1,
-      .x = 1052, .y = 633, .w = 58, .h = 58 },
+      .x = 1066, .y = 633, .w = 58, .h = 58 },
 };
 
 /* 在指定位置创建图片控件，返回控件句柄 */
@@ -692,6 +703,26 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
     ui->eco_lamp = add_image(page, UI_IMG("WarnIcon/eco.png"), 516, 459);
     lv_obj_add_flag(ui->eco_lamp, LV_OBJ_FLAG_HIDDEN);
 
+    /*
+     * Set 徽标：Qt IconSet 64×36，Row 中位于 XMode 之后、垂直居中。
+     * 白底 #FFFFFF、圆角 6、加粗 "set" 28px，默认隐藏。
+     */
+    ui->set_badge = lv_obj_create(page);
+    lv_obj_remove_style_all(ui->set_badge);
+    lv_obj_remove_flag(ui->set_badge, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_pos(ui->set_badge, 1066, 644);
+    lv_obj_set_size(ui->set_badge, 64, 36);
+    lv_obj_set_style_bg_color(ui->set_badge, lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_style_bg_opa(ui->set_badge, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(ui->set_badge, 6, 0);
+
+    lv_obj_t *set_label = lv_label_create(ui->set_badge);
+    lv_label_set_text(set_label, "set");
+    lv_obj_set_style_text_color(set_label, lv_color_black(), 0);
+    lv_obj_set_style_text_font(set_label, &lv_font_montserrat_28, 0);
+    lv_obj_center(set_label);
+    lv_obj_add_flag(ui->set_badge, LV_OBJ_FLAG_HIDDEN);
+
     /* 转向灯：Qt IconTurnSignals 位于 (660,98)，宽 600，左右图标各 54x48 */
     (void)ui_turn_signal_create(&ui->turn_signal, page,
                                 660, 98, 1206, 98, 54, 48);
@@ -901,6 +932,22 @@ static void s1_apply(ui_node_t *self, const car_state_view_t *view)
     eco_card_apply(&ui->eco, st);
     /* 巡航数值依赖 0x13，独立于警示灯帧，单独刷新 */
     ui_cruise_apply(&ui->cruise, st);
+
+    /* Set 徽标：Qt visible = GlobalData.items.speedok，即 cruise_state bit1 */
+    {
+        bool set_shown = (st->cruise.cruise_state & 0x02U) != 0U;
+
+        if(set_shown != ui->set_badge_shown) {
+            ui->set_badge_shown = set_shown;
+
+            if(set_shown) {
+                lv_obj_remove_flag(ui->set_badge, LV_OBJ_FLAG_HIDDEN);
+            }
+            else {
+                lv_obj_add_flag(ui->set_badge, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+    }
 
     /* ECO 指示：Qt show = GlobalData.items.ecoEnable && SettingsMgr.ecoIndicator */
     if(st->eco.valid && st->eco.enabled && st->eco_indicator) {

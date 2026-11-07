@@ -82,6 +82,44 @@ static int8_t assist_lamp_variant(const ui_lamp_group_item_t *cfg,
     return 0;
 }
 
+/*
+ * 非车道辅助的设置驱动灯：
+ *   XMode  Qt IconXMode，drive_mode 6/7/8 依次显示 xmode_w/snow/deepsnow，其余熄灭；
+ *   Set    Qt IconSet，cruise_state bit1（speedok）为真时点亮。
+ * 返回值同 assist_lamp_variant。
+ */
+static int8_t setting_lamp_variant(const ui_lamp_group_item_t *cfg,
+                                   const car_state_t *state, uint8_t *level)
+{
+    if((ui_lamp_gate_t)cfg->gate == UI_LAMP_GATE_SPEED_SET_OK) {
+        if((state->cruise.cruise_state & 0x02U) == 0U) {
+            return -1;
+        }
+
+        *level = (uint8_t)CAR_WARN_ON;
+        return 0;
+    }
+
+    /* XMode：6 雪地前 / 7 雪地 / 8 深雪；未收到驱动模式帧时显式熄灭，避免误报 */
+    switch(state->drive_mode) {
+    case 6U:
+    case 7U:
+    case 8U:
+        if((uint8_t)(state->drive_mode - 6U) < cfg->variant_count) {
+            if(!state->drive_mode_valid) {
+                return -1;
+            }
+
+            *level = (uint8_t)CAR_WARN_ON;
+            return (int8_t)(state->drive_mode - 6U);
+        }
+        return -1;
+
+    default:
+        return -1;
+    }
+}
+
 bool ui_lamp_group_create(ui_lamp_group_t *group, lv_obj_t *parent,
                           const ui_lamp_group_item_t *items, uint8_t count)
 {
@@ -133,6 +171,26 @@ void ui_lamp_group_apply(ui_lamp_group_t *group, const car_state_t *state)
         if(cfg->gate >= (uint8_t)UI_LAMP_GATE_EMERGENCY_BRAKING &&
            cfg->gate <= (uint8_t)UI_LAMP_GATE_LANE_DEPARTURE) {
             int8_t idx = assist_lamp_variant(cfg, state, &best_level);
+
+            if(idx < 0) {
+                best_level = 0U;
+            }
+            else {
+                best = idx;
+            }
+
+            if(best >= 0 && rt->active != best) {
+                rt->active = best;
+                ui_lamp_set_icon(&rt->lamp, &rt->dsc[best]);
+            }
+
+            lamp_apply_level(&rt->lamp, best_level);
+            continue;
+        }
+
+        if(cfg->gate == (uint8_t)UI_LAMP_GATE_XMODE ||
+           cfg->gate == (uint8_t)UI_LAMP_GATE_SPEED_SET_OK) {
+            int8_t idx = setting_lamp_variant(cfg, state, &best_level);
 
             if(idx < 0) {
                 best_level = 0U;

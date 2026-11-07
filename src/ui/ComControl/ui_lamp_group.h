@@ -45,6 +45,8 @@ typedef enum {
     UI_LAMP_GATE_EMERGENCY_BRAKING, /* Qt emergencyBraking，黄图条件 showcar > 0 */
     UI_LAMP_GATE_BLIND_SPOT,        /* Qt blindSpotWarning，黄图条件 showarea > 0 */
     UI_LAMP_GATE_LANE_DEPARTURE,    /* Qt laneDepartureWarning，黄图条件 carState > 1 */
+    UI_LAMP_GATE_XMODE,             /* Qt IconXMode：drive_mode 6/7/8 依次选第 1/2/3 张图 */
+    UI_LAMP_GATE_SPEED_SET_OK,      /* Qt IconSet：cruise_state bit1 为真时点亮 */
 } ui_lamp_gate_t;
 
 /* 样式层提供的单灯配置：绝对坐标 + 图标变体表 */
