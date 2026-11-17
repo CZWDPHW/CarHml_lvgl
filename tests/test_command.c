@@ -111,6 +111,29 @@ void test_command_suite(void)
     CHECK(!car_cmd_set_vehicle_setting(&req, 0U, 1U));
     CHECK(!car_cmd_set_vehicle_setting(&req, 32U, 1U));
 
+    /* 电动助力转向（Qt steeringMode）：index 9，status 1 运动 / 0 常规 */
+    CHECK(car_cmd_set_vehicle_setting(&req, 9U, 1U));
+    CHECK(req.payload[0] == 0x86);
+    CHECK(req.payload[1] == 0x49);
+    CHECK(car_cmd_set_vehicle_setting(&req, 9U, 0U));
+    CHECK(req.payload[1] == 0x09);
+
+    /* 驻车辅助/底盘控制：index 4~8/17~19/26/27 */
+    CHECK(car_cmd_set_vehicle_setting(&req, 4U, 0U));
+    CHECK(req.payload[0] == 0x86 && req.payload[1] == 0x04);
+    CHECK(car_cmd_set_vehicle_setting(&req, 26U, 0U));
+    CHECK(req.payload[1] == 0x1A);
+    CHECK(car_cmd_set_vehicle_setting(&req, 17U, 2U));
+    CHECK(req.payload[1] == (uint8_t)((2U << 6) | 17U));
+    CHECK(car_cmd_set_vehicle_setting(&req, 18U, 1U));
+    CHECK(req.payload[1] == (uint8_t)((1U << 6) | 18U));
+    CHECK(car_cmd_set_vehicle_setting(&req, 27U, 2U));
+    CHECK(req.payload[1] == (uint8_t)((2U << 6) | 27U));
+    CHECK(car_cmd_set_vehicle_setting(&req, 8U, 0U));
+    CHECK(req.payload[1] == 0x08);
+    CHECK(car_cmd_set_vehicle_setting(&req, 19U, 0U));
+    CHECK(req.payload[1] == 0x13);
+
     /* 扩展 ack：control 1 = 灯光关闭延时，control 2 = 点灯灵敏度 */
     CHECK(car_cmd_set_vehicle_setting_ext(&req, 1U, 5U));
     CHECK(req.cmd_id == 0x16 && req.len == 3);

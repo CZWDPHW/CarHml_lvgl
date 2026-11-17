@@ -22,6 +22,11 @@ extern "C" {
 #define UI_IMG(path) UI_ASSET_ROOT path
 
 /*
+ * 前缀 "./assets" 由 LV_FS_STDIO_PATH 在编译期拼接，运行期不可改；
+ * 因此"资源固定到某个版本"由启动器在 exec 前切换工作目录到版本目录实现。
+ */
+
+/*
  * 创建铺满屏幕、按 Qt 设计坐标摆放的页面容器。
  * 之后的控件都直接使用 Qt 里的原始 x/y/width/height。
  */

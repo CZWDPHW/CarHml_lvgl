@@ -5,6 +5,7 @@
  */
 #include "ui/ui_node.h"
 #include "ui/ui_common.h"
+#include "ui/ui_fonts.h"
 
 typedef struct {
     ui_node_t base;
@@ -23,18 +24,18 @@ static bool g1_create(ui_node_t *self, lv_obj_t *parent)
     lv_obj_t *title = lv_label_create(page);
 
     lv_label_set_text(title, "GeneralUi1 (placeholder)");
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_font(title, UI_TEXT(36), 0);
     lv_obj_set_style_text_color(title, lv_color_white(), 0);
     lv_obj_set_pos(title, 700, 300);
 
     ui->speed_label = lv_label_create(page);
-    lv_obj_set_style_text_font(ui->speed_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(ui->speed_label, UI_TEXT(28), 0);
     lv_obj_set_style_text_color(ui->speed_label, lv_color_white(), 0);
     lv_obj_set_pos(ui->speed_label, 700, 360);
     lv_label_set_text(ui->speed_label, "SPEED: 0 km/h");
 
     ui->rpm_label = lv_label_create(page);
-    lv_obj_set_style_text_font(ui->rpm_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(ui->rpm_label, UI_TEXT(28), 0);
     lv_obj_set_style_text_color(ui->rpm_label, lv_color_white(), 0);
     lv_obj_set_pos(ui->rpm_label, 700, 400);
     lv_label_set_text(ui->rpm_label, "RPM: 0");

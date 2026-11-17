@@ -22,6 +22,7 @@
 #include "ui/ui_app.h"
 #include "ui/ui_node.h"
 #include "ui/ui_style.h"
+#include "ui/settings/ui_settings_page.h"
 
 #define CHECK(cond)                                                          \
     do {                                                                     \
@@ -738,6 +739,20 @@ static void capture_cmd(const car_cmd_t *cmd)
     s_last_cmd = *cmd;
 }
 
+/* 注入车辆设置回读值（等价 0x16 Status 更新），设置页据此显示并取反/取选项 */
+static void apply_vehicle_settings(const car_vehicle_setting_t *vs)
+{
+    car_state_t st;
+    car_state_view_t view;
+
+    car_state_init(&st);
+    st.vehicle_setting = *vs;
+    memset(&view, 0, sizeof(view));
+    view.has_data = true;
+    view.state = st;
+    ui_app_apply(&view);
+}
+
 static void test_style_switch_persists_and_refreshes(void)
 {
     static const uint8_t expected[] = {
@@ -818,9 +833,15 @@ static void test_settings_vehicle_light(void)
     /* 返回车辆设置，下移到 DOORS，进入车门设置 */
     push_key(20U, 1U); /* 下移到 AUTO INTERIOR */
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* 下移到 HEADLIGHT SENSITIVITY */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* 下移到 LIGHT OFF DELAY */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
     push_key(20U, 1U); /* 下移到 BACK */
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
     push_key(23U, 1U); /* 返回车辆设置，焦点在 LIGHT SETTINGS */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* 下移到 TURN LIGHT */
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
     push_key(20U, 1U); /* 下移到 DOORS */
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
@@ -843,6 +864,313 @@ static void test_settings_vehicle_light(void)
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
     CHECK(s_cmd_count == 3U);
     CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 16U));
+
+    ui_app_settings_set_cmd_cb(NULL);
+    teardown_forester();
+}
+
+/* 车辆设置 → 转向灯 / 雨刷器：OK 只下发 0x16，索引与回读取反一致 */
+static void test_settings_vehicle_turn_wiper(void)
+{
+    setup_forester();
+    ui_app_settings_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    root_move_to(ROOT_ITINERARY_INDEX);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 选中 LIGHT SETTINGS 后下移到 TURN LIGHT，进入转向灯 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 选中 LANE CHANGE FLASH，再 OK 下发 index 12（回读 ON -> OFF） */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 0x16U);
+    CHECK(s_last_cmd.payload[0] == 0x86U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((0U << 6) | 12U));
+    CHECK(s_last_cmd.payload[2] == 0x00U);
+
+    /* 返回车辆设置，下移到 WIPER，进入雨刷器 */
+    push_key(20U, 1U); /* 下移到 BACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 返回车辆设置，焦点在 TURN LIGHT */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* DOORS */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* WIPER */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 进入雨刷器 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 三项依次取反下发 index 20 / 21 / 22 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 2U);
+    CHECK(s_last_cmd.payload[0] == 0x86U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((0U << 6) | 20U));
+
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 3U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((0U << 6) | 21U));
+
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 4U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((0U << 6) | 22U));
+
+    ui_app_settings_set_cmd_cb(NULL);
+    teardown_forester();
+}
+
+/* 车辆设置 → 保养设置：数字编辑确认下发 0x36，剩余/重置为 2 字节 */
+static void test_settings_vehicle_service(void)
+{
+    setup_forester();
+    ui_app_settings_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    root_move_to(ROOT_ITINERARY_INDEX);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* LIGHT -> TURN -> DOORS -> WIPER -> SERVICE */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    for(uint8_t i = 0U; i < 4U; ++i) {
+        push_key(20U, 1U);
+        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    }
+    push_key(23U, 1U); /* 进入保养主列表 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 选中 OIL CHANGE，进入子页 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 选中 SET SERVICE KM，进入数字编辑 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 6 位 -> CONFIRM，默认 5000 原样下发 */
+    for(uint8_t i = 0U; i < 6U; ++i) {
+        push_key(20U, 1U);
+        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    }
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 0x36U);
+    CHECK(s_last_cmd.op == CAR_OP_SET_GET);
+    CHECK(s_last_cmd.len == 4U);
+    CHECK(s_last_cmd.payload[0] == 0U);    /* 机油 */
+    CHECK(s_last_cmd.payload[1] == 0x00U); /* 5000 = 0x001388 */
+    CHECK(s_last_cmd.payload[2] == 0x13U);
+    CHECK(s_last_cmd.payload[3] == 0x88U);
+
+    /* 剩余公里数查询：{item, 0} */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 2U);
+    CHECK(s_last_cmd.cmd_id == 0x36U);
+    CHECK(s_last_cmd.len == 2U);
+    CHECK(s_last_cmd.payload[0] == 0U);
+    CHECK(s_last_cmd.payload[1] == 0x00U);
+
+    /* 重置：{item, 1} */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 3U);
+    CHECK(s_last_cmd.len == 2U);
+    CHECK(s_last_cmd.payload[0] == 0U);
+    CHECK(s_last_cmd.payload[1] == 0x01U);
+
+    ui_app_settings_set_cmd_cb(NULL);
+    teardown_forester();
+}
+
+/*
+ * 工厂门控项：点灯灵敏度（扩展 control 2）、灯光关闭延时（扩展 control 1）、
+ * 外部车门 13 / 单车门解锁 14 / 智能钥匙 24 / 选择解锁 25 / 自动上锁 28、
+ * 远程启动发动机 23。选项值与 Qt PageListSelect 一致。
+ */
+static void test_settings_vehicle_gated(void)
+{
+    car_vehicle_setting_t vs;
+
+    setup_forester();
+    ui_app_settings_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    root_move_to(ROOT_ITINERARY_INDEX);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* VEHICLE */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 进入车辆设置 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 回读值：灵敏度 FAST(2)、延时 90s(5)、远程启动 ON，其余默认 OFF */
+    memset(&vs, 0, sizeof(vs));
+    vs.headlight_sensitivity = 2U;
+    vs.headlight_off_delay = 5U;
+    vs.remote_engine_start = true;
+    apply_vehicle_settings(&vs);
+
+    /* 灯光设置：WELCOME -> AUTO INTERIOR -> SENSITIVITY */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* WELCOME */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* AUTO INTERIOR */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* SENSITIVITY */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    /* 进入多选，焦点在 FAST(2)，下移到 VERY FAST(3) 后确认 */
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 0x16U);
+    CHECK(s_last_cmd.len == 3U);
+    CHECK(s_last_cmd.payload[0] == 0x86U);
+    CHECK(s_last_cmd.payload[1] == 0x00U); /* 扩展帧：控制字放第 3 字节 */
+    CHECK(s_last_cmd.payload[2] == (uint8_t)((3U << 4) | 2U));
+
+    /* 下移到灯光关闭延时，焦点在 90s(5)，改选 120s(6) 后确认 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 2U);
+    CHECK(s_last_cmd.payload[1] == 0x00U);
+    CHECK(s_last_cmd.payload[2] == (uint8_t)((6U << 4) | 1U));
+
+    /* 返回车辆设置，LIGHT -> TURN -> DOORS */
+    push_key(20U, 1U); /* DELAY -> BACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 返回车辆设置 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* TURN LIGHT */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U); /* DOORS */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 进入车门设置 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 选中 HORN FEEDBACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+
+    /* 自动解锁：缺省 0 -> 1 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 3U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 16U));
+
+    /* 外部车门 index 13：回读 OFF -> ON */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 4U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 13U));
+
+    /* 单车门解锁 index 14 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 5U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 14U));
+
+    /* 智能钥匙 index 24 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 6U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 24U));
+
+    /* 选择解锁 index 25 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 7U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 25U));
+
+    /* 车门自动上锁：多选页 3 项，缺省 SPEED(0) -> P SHIFT(1)，走 index 28 */
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(20U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 8U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((1U << 6) | 28U));
+
+    /* 返回车辆设置，DOORS -> WIPER -> SERVICE -> REMOTE START，回读 ON -> OFF */
+    push_key(20U, 1U); /* AUTO DOOR LOCK -> BACK */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    push_key(23U, 1U); /* 返回车辆设置 */
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    for(uint8_t i = 0U; i < 3U; ++i) {
+        push_key(20U, 1U);
+        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    }
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    CHECK(s_cmd_count == 9U);
+    CHECK(s_last_cmd.payload[1] == (uint8_t)((0U << 6) | 23U));
 
     ui_app_settings_set_cmd_cb(NULL);
     teardown_forester();
@@ -922,6 +1250,617 @@ static void test_card_mask_live(void)
     teardown_forester();
 }
 
+static void test_boot_animation_selection(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    ui_key_event_t key = {0};
+    car_settings_reset(&settings);
+    ui_settings_page_set_settings(&settings);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 5U;
+    key.pressed = 1U;
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SELECT);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SELECT);
+    CHECK(page.st.select_index == 1U);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.select_index == 2U);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.select_index == 0U);
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.animation_style == 0U);
+    CHECK(ui_settings_page_back(&page));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+    CHECK(!car_settings_dirty(&settings));
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.animation_style == 1U);
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+}
+
+static void test_date_wheel(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    ui_key_event_t key = {.pressed = 1, .code = UI_KEY_OK};
+    car_clock_t clock = {.valid = true, .year = 2026, .month = 2,
+                         .day = 28, .hour = 10, .minute = 11};
+    car_units_t units = {.valid = true, .mile = true, .hour24 = true,
+                         .fahrenheit = true, .fuel_unit = 2, .pressure_unit = 1};
+    car_cmd_t expected;
+
+    car_settings_reset(&settings);
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_set_cmd_cb(capture_cmd);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+
+    /* 非仪表时间源：只有时间源/返回两行，OK 在时间源行下发 0x05 */
+    ui_settings_page_set_date(&page, &clock, &units, 1);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 1;
+    s_cmd_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_DATE);
+    CHECK(page.st.date_item == 0U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 5 && s_last_cmd.payload[0] == 6 && s_last_cmd.payload[1] == 2);
+    CHECK(page.time_source == 1);
+    /* 两行循环：0 → 1 → 0（右/上都是 next） */
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 1U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 0U);
+    key.code = UI_KEY_LEFT;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 1U);
+    /* 返回行 OK：回系统设置并停在日期时间行 */
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM && page.st.system_index == 1U);
+
+    /* 仪表时间源：进入滚轮页，光标停在时间源行（Qt sourceIndex=2）。
+     * 时间源 2 未变化 → 不重进滚轮，草稿保留上一次的值。 */
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_DATE);
+    CHECK(!lv_obj_has_flag(page.date_wheel_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(page.st.date_item == 2U && page.st.date_focus == 0xFFU);
+    CHECK(page.st.date_year_base == 2021U);
+    CHECK(page.st.date_values[1] == 1U && page.st.date_values[2] == 27U);
+    CHECK(strcmp(lv_label_get_text(page.title), "TIME SETTINGS") == 0U);
+    /* 时间源行 OK：下发 0x05 {6,1}（仪表 → 取反） */
+    s_cmd_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_cmd_count == 1U);
+    CHECK(s_last_cmd.cmd_id == 5 && s_last_cmd.op == CAR_OP_SET_GET &&
+          s_last_cmd.len == 2U && s_last_cmd.payload[0] == 6 && s_last_cmd.payload[1] == 1);
+    /* 行移动：2→3（返回）→0（滚轮），末端回到 0 */
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 3U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 0U);
+    key.code = UI_KEY_OK;
+
+    /* 时间源切回仪表：重进滚轮，草稿取回读值 2026-02-28 10:11 */
+    ui_settings_page_set_date(&page, &clock, &units, 1);
+    CHECK(page.time_source == 1U);
+    CHECK(page.st.date_focus == 0xFFU);
+    CHECK(ui_settings_page_key(&page, &key)); /* OK 进入非仪表时间源页 */
+    CHECK(page.st.date_item == 0U);           /* 首项 */
+    CHECK(ui_settings_page_key(&page, &key)); /* 首项：下发时间源 */
+    key.code = UI_KEY_LEFT;                   /* 两行：next → 返回行 */
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 1U); /* 非仪表只有时间源/返回两行 */
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM && page.st.system_index == 1U);
+    /* 时间源改回仪表：重进滚轮 */
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_DATE);
+    CHECK(page.st.date_item == 2U && page.st.date_focus == 0xFFU);
+    /* 回到滚轮行（Qt rowCount=4 取模） */
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 3U);
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_item == 0U && page.st.date_focus == 0xFFU);
+    CHECK(page.st.date_year_base == 2021U);
+    CHECK(page.st.date_values[0] == 5U && page.st.date_values[1] == 1U &&
+          page.st.date_values[2] == 27U && page.st.date_values[3] == 10U &&
+          page.st.date_values[4] == 11U);
+    /* 滚轮行：OK 进入第 0 列，再 OK 到第 1 列 */
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_focus == 0U && page.st.date_item == 0U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_focus == 1U);
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[1] == 2U);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.date_values[1] == 3U);
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[1] == 2U);
+    /* 月列取模：12 → 1，1 → 12 */
+    page.st.date_values[1] = 12U; /* 真实 13 月，超出取模范围 */
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[1] == 1U);
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[1] == 0U);
+    /* 12 月（索引 11）→ 1 月（索引 0），日被截到 31 日以内 */
+    page.st.date_values[1] = 11U;
+    page.st.date_values[2] = 30U;
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[1] == 0U);
+    CHECK(page.st.date_values[2] == 30U);
+    /* 二月（索引 1，2026 非闰年 28 天，日索引 0~27）加一后截到 27 */
+    page.st.date_focus = 2U;
+    page.st.date_values[1] = 1U;
+    page.st.date_values[2] = 27U;
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[2] == 27U);
+    page.st.date_values[2] = 26U;
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[2] == 27U);
+    /* 年列：2021 起 31 项（2021~2051），索引 30 到顶、0 到底都不循环 */
+    page.st.date_focus = 0U;
+    page.st.date_values[0] = 30U;
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[0] == 30U);
+    /* 中间值减一正常 */
+    page.st.date_values[0] = 5U;
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[0] == 4U);
+    page.st.date_values[0] = 0U;
+    key.code = UI_KEY_DOWN; /* 年列到底不循环 */
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_values[0] == 0U);
+    /* OK 从分钟列前进到确认列；确认列 UP 反向回到分钟列 */
+    page.st.date_item = 0U;
+    page.st.date_focus = 4U;
+    page.st.date_child_back = false;
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_focus == 5U);
+    CHECK(page.st.date_child_back);
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.date_focus == 4U);
+
+    /* 确认下发 0x32：2026-03-01 10:11 */
+    page.st.date_values[0] = 5U;
+    page.st.date_values[1] = 2U;
+    page.st.date_values[2] = 0U;
+    page.st.date_values[3] = 10U;
+    page.st.date_values[4] = 11U;
+    page.st.date_focus = 5U;
+    page.st.date_item = 0U;
+    key.code = UI_KEY_OK;
+    s_cmd_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_cmd_count == 1U);
+    /* hour 的 bit7 标记 24 小时制（car_cmd_set_time 固定置位） */
+    CHECK(s_last_cmd.cmd_id == 0x32 && s_last_cmd.payload[0] == 26 &&
+          s_last_cmd.payload[1] == 3 && s_last_cmd.payload[2] == 1 &&
+          s_last_cmd.payload[3] == (10 | 0x80) && s_last_cmd.payload[4] == 11);
+    CHECK(page.st.date_focus == 0xFFU);
+    /* 非法日期（2/29 非闰年）不下发 */
+    page.st.date_values[1] = 1U;
+    page.st.date_values[2] = 28U;
+    page.st.date_focus = 5U;
+    page.st.date_item = 0U;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_cmd_count == 1U);
+
+    /* 时间制式行：24h → 12h */
+    page.st.date_focus = 0xFFU;
+    page.st.date_item = 1U;
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    s_cmd_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(car_cmd_set_units(&expected, true, false, true, 2, 1));
+    CHECK(s_cmd_count == 1U && s_last_cmd.cmd_id == expected.cmd_id);
+    CHECK(memcmp(s_last_cmd.payload, expected.payload, expected.len) == 0);
+    units.hour24 = false;
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    CHECK(!page.date_units.hour24);
+
+    /* 回读不覆盖编辑中的草稿；退出后重新进入取回读值 */
+    clock = (car_clock_t){.valid = true, .year = 2024, .month = 2,
+                          .day = 29, .hour = 10, .minute = 11};
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    CHECK(page.st.date_values[1] == 1U && page.st.date_values[2] == 28U);
+    CHECK(page.st.date_year_base == 2021U);
+    page.st.date_item = 3U;
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM && page.st.system_index == 1U);
+    clock = (car_clock_t){.valid = true, .year = 2024, .month = 2,
+                          .day = 29, .hour = 10, .minute = 11};
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_DATE);
+    CHECK(page.st.date_values[0] == 5U && page.st.date_values[1] == 1U &&
+          page.st.date_values[2] == 28U);
+
+    /* 系统设置列表的日期时间摘要 */
+    CHECK(ui_settings_page_back(&page));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.system_rows[1], 1)),
+                 "2024.2.29 10:11") == 0);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.system_rows[1], 0)),
+                 "DATE & TIME") == 0);
+    clock = (car_clock_t){.valid = true, .year = 2026, .month = 3,
+                          .day = 4, .hour = 9, .minute = 5};
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    ui_settings_page_apply(&page);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+    ui_settings_page_set_cmd_cb(NULL);
+}
+
+static void test_date_and_connect(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    ui_key_event_t key = {0};
+    car_settings_reset(&settings);
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_set_cmd_cb(capture_cmd);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    s_cmd_count = 0;
+    key.pressed = 1;
+    key.code = UI_KEY_OK;
+    page.st.view = UI_SETTINGS_VIEW_CONNECT;
+    page.st.date_index = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_enabled == 1);
+    page.st.date_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_mode == 1);
+    CHECK(lv_label_get_text(page.title)[0] == '\0'); /* Qt 互联仍在根分类中，保留图标行。 */
+    CHECK(strstr(lv_label_get_text(lv_obj_get_child(page.date_rows[0], 0)), "CONFIG ONLY") != NULL);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_rows[1], 0)), "APPLE CARPLAY") == 0);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_mode == 2);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_rows[1], 0)), "HICAR") == 0);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_mode == 0);
+    page.st.date_index = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_enabled == 0);
+    page.st.date_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.connect_mode == 0);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.view == UI_SETTINGS_VIEW_CONNECT);
+    CHECK(page.st.date_index == 2);
+    ui_settings_page_next_or_back(&page);
+    CHECK(page.st.date_index == 0);
+    /* 互联页仅保存配置（SDK 不可用），不下发串口命令 */
+    CHECK(s_cmd_count == 0U);
+    CHECK(car_settings_dirty(&settings));
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+    ui_settings_page_set_cmd_cb(NULL);
+}
+
+static void check_label_glyphs(lv_obj_t *root);
+
+/* 设置页中文：日期时间滚轮页各状态的整体翻译与缺字检查 */
+static void test_date_language(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    ui_key_event_t key = {.pressed = 1, .code = UI_KEY_OK};
+    car_clock_t clock = {.valid = true, .year = 2026, .month = 3,
+                         .day = 4, .hour = 9, .minute = 5};
+    car_units_t units = {.valid = true, .mile = true, .hour24 = true,
+                         .fahrenheit = true, .fuel_unit = 2, .pressure_unit = 1};
+
+    car_settings_reset(&settings);
+    CHECK(car_settings_set_language(&settings, 0));
+    ui_settings_page_set_settings(&settings);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    ui_settings_page_set_date(&page, &clock, &units, 2);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_DATE);
+    CHECK(strcmp(lv_label_get_text(page.title), "时间设置") == 0);
+    lv_obj_t *rows[] = {page.date_wheel_rows[0], page.date_wheel_rows[1],
+                        page.date_wheel_rows[2]};
+    const char *expected[] = {"时间制式: 24小时", "时间源: 仪表", "返回"};
+    for(unsigned i = 0; i < 3; ++i) {
+        CHECK(strcmp(lv_label_get_text(lv_obj_get_child(rows[i], 0)), expected[i]) == 0);
+    }
+    lv_label_set_text(lv_obj_get_child(page.date_wheel_confirm, 0), NULL); /* 还原显示用省略号 */
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_wheel_confirm, 0)),
+                 "确认") == 0);
+    /* 中文 24px 不得超出滚轮行宽 */
+    for(unsigned i = 0; i < 3; ++i) {
+        lv_obj_t *label = lv_obj_get_child(rows[i], 0);
+        lv_point_t size;
+        lv_text_get_size(&size, lv_label_get_text(label),
+                         lv_obj_get_style_text_font(label, 0), 0, 0,
+                         LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        CHECK(size.x <= 524 - 16);
+    }
+    check_label_glyphs(page.root);
+    /* 非仪表时间源同样全覆盖：首行提示，第二行时间源 */
+    units.hour24 = false;
+    ui_settings_page_set_date(&page, &clock, &units, 1);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_wheel_rows[0], 0)),
+                 "请在音响里操作") == 0);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_wheel_rows[1], 0)),
+                 "时间源: 中控") == 0);
+    ui_settings_page_set_date(&page, &clock, &units, 0);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_wheel_rows[1], 0)),
+                 "时间源: 未知") == 0);
+    check_label_glyphs(page.root);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+    CHECK(car_settings_set_language(&settings, 1));
+}
+
+static void check_label_glyphs(lv_obj_t *root)
+{
+    if(lv_obj_check_type(root, &lv_label_class)) {
+        const unsigned char *p = (const unsigned char *)lv_label_get_text(root);
+        const lv_font_t *font = lv_obj_get_style_text_font(root, 0);
+        while(*p) {
+            uint32_t cp = *p++;
+            if(cp >= 0xe0 && cp < 0xf0) {
+                cp = ((cp & 15U) << 12) | ((p[0] & 63U) << 6) | (p[1] & 63U);
+                p += 2;
+            }
+            else if(cp >= 0xc0 && cp < 0xe0) cp = ((cp & 31U) << 6) | (*p++ & 63U);
+            lv_font_glyph_dsc_t glyph;
+            if(cp > 127) {
+                bool found = lv_font_get_glyph_dsc(font, &glyph, cp, 0);
+                CHECK(found && !glyph.is_placeholder);
+                if(found && !glyph.is_placeholder && glyph.box_w && glyph.box_h) {
+                    /* A descriptor can exist even when bitmap decompression is disabled. */
+                    lv_draw_buf_t *buf = lv_draw_buf_create(glyph.box_w, glyph.box_h,
+                                                           LV_COLOR_FORMAT_A8, 0);
+                    CHECK(buf != NULL);
+                    if(buf) {
+                        lv_draw_buf_clear(buf, NULL);
+                        const void *bitmap = lv_font_get_glyph_bitmap(&glyph, buf);
+                        CHECK(bitmap != NULL);
+                        bool has_ink = false;
+                        for(uint32_t j = 0; bitmap && j < buf->data_size; ++j)
+                            has_ink |= buf->data[j] != 0;
+                        CHECK(has_ink);
+                        lv_font_glyph_release_draw_data(&glyph);
+                        lv_draw_buf_destroy(buf);
+                    }
+                }
+            }
+        }
+    }
+    for(uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+        check_label_glyphs(lv_obj_get_child(root, i));
+}
+
+static void test_language_factory(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    ui_key_event_t key = {.pressed = 1, .code = UI_KEY_OK};
+    car_settings_reset(&settings);
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_set_cmd_cb(capture_cmd);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_LANGUAGE);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.language == 0);
+    CHECK(strcmp(lv_label_get_text(page.title), "语言") == 0);
+    check_label_glyphs(page.root);
+    for(unsigned i = 2; i < 19; ++i) {
+        page.st.factory_index = i;
+        CHECK(ui_settings_page_key(&page, &key));
+        CHECK(settings.values.language == 0);
+    }
+    page.st.factory_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.language == 1);
+    CHECK(strcmp(lv_label_get_text(page.title), "LANGUAGE") == 0);
+    lv_label_set_text(lv_obj_get_child(page.system_rows[3], 0), NULL);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.system_rows[3], 0)), "FACTORY SETTINGS") == 0);
+    CHECK(ui_settings_page_back(&page));
+    page.st.system_index = 3;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD);
+    page.st.factory_index = 4;
+    s_cmd_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_error && !page.st.factory_unlocked && s_cmd_count == 0);
+    const uint8_t password[] = {1, 6, 8, 8};
+    memcpy(page.st.factory_digits, password, sizeof(password));
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_unlocked && page.st.view == UI_SETTINGS_VIEW_FACTORY);
+    page.st.factory_index = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    const uint8_t mileage[] = {1, 2, 3, 4, 5, 6};
+    memcpy(page.st.factory_digits, mileage, sizeof(mileage));
+    page.st.factory_index = 6;
+    CHECK(ui_settings_page_key(&page, &key));
+    car_cmd_t expected;
+    CHECK(car_cmd_set_mileage(&expected, 123456));
+    CHECK(s_cmd_count == 1 && s_last_cmd.cmd_id == expected.cmd_id);
+    CHECK(memcmp(s_last_cmd.payload, expected.payload, expected.len) == 0);
+    page.st.factory_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    page.st.factory_index = 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.fuel_tank == 69 && s_cmd_count == 2);
+    CHECK(car_cmd_set_fuel_tank(&expected, 0, 69));
+    CHECK(memcmp(s_last_cmd.payload, expected.payload, expected.len) == 0);
+    page.st.factory_index = 5;
+    CHECK(ui_settings_page_key(&page, &key));
+    for(unsigned i = 0; i < 11; ++i) {
+        page.st.factory_index = i;
+        CHECK(ui_settings_page_key(&page, &key));
+    }
+    CHECK(settings.values.factory_features == 0 && s_cmd_count == 2);
+    CHECK(lv_obj_has_flag(page.vehicle_rows[5], LV_OBJ_FLAG_HIDDEN));
+    CHECK(settings.values.radar_on == 1);
+    CHECK(ui_settings_page_back(&page));
+    page.st.factory_index = 4;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_cmd_count == 2); /* 无车型回读不得发送伪造编号 */
+    page.factory_models.valid = true;
+    page.factory_models.parsed = CAR_MODEL_MAX;
+    page.factory_models.entries[CAR_MODEL_MAX - 1].id = 42;
+    page.st.factory_index = CAR_MODEL_MAX - 1;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(car_cmd_set_car_model(&expected, 42));
+    CHECK(s_cmd_count == 3 && memcmp(s_last_cmd.payload, expected.payload, expected.len) == 0);
+    CHECK(ui_settings_page_back(&page));
+    ui_settings_page_set_cmd_cb(NULL);
+    page.st.factory_index = 7;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.radar_on == 1 && s_cmd_count == 3);
+    CHECK(ui_settings_page_back(&page));
+    CHECK(!page.st.factory_unlocked);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+}
+
+static void check_visible_text(lv_obj_t *label)
+{
+    lv_area_t visible;
+    lv_obj_update_layout(label);
+    lv_obj_get_coords(label, &visible);
+    CHECK(lv_label_get_text(label)[0] != '\0');
+    CHECK(lv_obj_get_width(label) > 0 && lv_obj_get_height(label) > 0);
+    for(lv_obj_t *p = label; p; p = lv_obj_get_parent(p)) {
+        lv_area_t bounds;
+        lv_obj_get_coords(p, &bounds);
+        CHECK(!lv_obj_has_flag(p, LV_OBJ_FLAG_HIDDEN));
+        visible.x1 = LV_MAX(visible.x1, bounds.x1);
+        visible.y1 = LV_MAX(visible.y1, bounds.y1);
+        visible.x2 = LV_MIN(visible.x2, bounds.x2);
+        visible.y2 = LV_MIN(visible.y2, bounds.y2);
+        CHECK(visible.x1 <= visible.x2 && visible.y1 <= visible.y2);
+    }
+    if(lv_area_get_height(&visible) != lv_obj_get_height(label))
+        fprintf(stderr, "clipped text: %s (visible=%d height=%d)\n",
+                lv_label_get_text(label), (int)lv_area_get_height(&visible),
+                (int)lv_obj_get_height(label));
+    CHECK(lv_area_get_height(&visible) == lv_obj_get_height(label));
+}
+
+static void test_settings_visible_geometry(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    car_settings_reset(&settings);
+    ui_settings_page_set_settings(&settings);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    for(unsigned language = 0; language < 2; ++language) {
+        settings.values.language = language;
+        ui_settings_state_init(&page.st);
+        for(unsigned selected = 0; selected < UI_SETTINGS_ROOT_COUNT; ++selected) {
+            page.st.root_index = selected;
+            ui_settings_page_apply(&page);
+            lv_obj_update_layout(page.root);
+            CHECK(!lv_obj_has_flag(page.root_bar, LV_OBJ_FLAG_HIDDEN));
+            CHECK(lv_obj_get_y(page.root_bar) == 80);
+            for(unsigned item = 0; item < UI_SETTINGS_ROOT_COUNT; ++item) {
+                CHECK(lv_obj_get_x(page.root_menu[item]) == 70 + 100 * (int32_t)item);
+                CHECK(lv_obj_get_y(page.root_menu[item]) == 10);
+                CHECK(lv_obj_get_width(page.root_menu[item]) == 52);
+                CHECK(lv_obj_has_flag(lv_obj_get_child(page.root_menu[item], 1),
+                                      LV_OBJ_FLAG_HIDDEN) == (item != selected));
+            }
+        }
+        page.st.view = UI_SETTINGS_VIEW_MY_CAR;
+        ui_settings_page_apply(&page);
+        check_visible_text(lv_obj_get_child(page.mycar_rows[0], 0));
+        for(unsigned i = 0; i < UI_SETTINGS_MYCAR_COUNT; ++i) {
+            page.st.mycar_index = i;
+            ui_settings_page_apply(&page);
+            check_visible_text(lv_obj_get_child(page.mycar_rows[i], 0));
+        }
+        for(unsigned root = 0; root < 3; ++root) {
+            page.st.view = UI_SETTINGS_VIEW_ROOT;
+            page.st.root_index = root;
+            ui_settings_page_apply(&page);
+            lv_obj_t *row = root == 0 ? page.it_rows[0] :
+                            root == 1 ? page.info_rows[0] : page.mycar_rows[0];
+            check_visible_text(lv_obj_get_child(row, 0));
+        }
+        page.st.view = UI_SETTINGS_VIEW_CONNECT;
+        ui_settings_page_apply(&page);
+        check_visible_text(lv_obj_get_child(page.date_rows[0], 0));
+        page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+        ui_settings_page_apply(&page);
+        CHECK(!lv_obj_has_flag(page.root_bar, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_label_get_text(page.title)[0] == '\0');
+        CHECK(lv_obj_get_height(page.system_list) == 300);
+        CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.system_rows[1], 0)),
+                     language == 0 ? "日期时间" : "DATE & TIME") == 0);
+        CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.system_rows[1], 1)), "--.--") == 0);
+        for(unsigned i = 0; i < UI_SETTINGS_SYSTEM_COUNT; ++i) {
+            page.st.system_index = i;
+            ui_settings_page_apply(&page);
+            check_visible_text(lv_obj_get_child(page.system_rows[i], 0));
+        }
+        page.st.view = UI_SETTINGS_VIEW_LANGUAGE;
+        ui_settings_page_apply(&page);
+        lv_obj_update_layout(page.root);
+        CHECK(lv_obj_has_flag(page.root_bar, LV_OBJ_FLAG_HIDDEN));
+        CHECK(lv_obj_get_y(page.body) == 140);
+        for(unsigned i = 0; i < 20; ++i) {
+            page.st.factory_index = i;
+            ui_settings_page_apply(&page);
+            check_visible_text(lv_obj_get_child(page.factory_rows[i], 0));
+        }
+    }
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+}
+
 int main(void)
 {
     lv_display_t *display;
@@ -949,9 +1888,18 @@ int main(void)
     test_style_options_per_vehicle();
     test_style_switch_persists_and_refreshes();
     test_settings_vehicle_light();
+    test_settings_vehicle_turn_wiper();
+    test_settings_vehicle_service();
+    test_settings_vehicle_gated();
     test_batch_order();
     test_card_mask_live();
     test_empty_queue();
+    test_boot_animation_selection();
+    test_date_and_connect();
+    test_date_wheel();
+    test_date_language();
+    test_language_factory();
+    test_settings_visible_geometry();
 
     printf("steering_key: %d checks, %d failures\n", g_checks, g_failures);
     return (g_failures == 0) ? 0 : 1;

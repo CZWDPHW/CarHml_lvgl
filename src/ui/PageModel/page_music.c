@@ -10,7 +10,7 @@
  *   歌词：列宽 787、整体居中、间距 20；歌名 28 号粗体 #FDA23B，歌词 32 号粗体白色、自动换行
  *   节奏柱：12 根 12×100、间距 10，底边距 230；柱宽 12、圆角 6、#FDA23B 70%，上浅下深渐变
  *
- * LVGL 无 64/42/40/32 号字体，分别用 48/44/44/36。
+ * Fonts use the original Qt pixel sizes; generated subsets include CJK.
  */
 #include "ui/PageModel/page_music.h"
 
@@ -125,7 +125,7 @@ static void fm_create(music_card_t *card, lv_obj_t *body)
     lv_obj_align(card->fm, LV_ALIGN_BOTTOM_MID, 0, -FM_BOTTOM);
 
     card->fm_source = label_create(card->fm, "FM RADIO",
-                                   &lv_font_montserrat_48, 0xFFFFFFU);
+                                   UI_TEXT(64), 0xFFFFFFU);
 
     freq_box = ui_blank_container(card->fm);
     lv_obj_set_size(freq_box, 260, 80);
@@ -141,7 +141,7 @@ static void fm_create(music_card_t *card, lv_obj_t *body)
     lv_image_set_inner_align(freq_img, LV_IMAGE_ALIGN_CONTAIN);
 
     card->fm_freq = label_create(freq_box, "98.5",
-                                 &lv_font_montserrat_44, COLOR_FREQ);
+                                 UI_TEXT_BOLD(40), COLOR_FREQ);
     lv_obj_align(card->fm_freq, LV_ALIGN_CENTER, 0, 0);
 
     lv_obj_add_flag(card->fm, LV_OBJ_FLAG_HIDDEN);
@@ -161,12 +161,12 @@ static void phone_create(music_card_t *card)
     lv_obj_set_size(icon, 120, 120);
     lv_image_set_inner_align(icon, LV_IMAGE_ALIGN_CONTAIN);
 
-    card->phone_name = label_create(card->phone, "", &lv_font_montserrat_44,
+    card->phone_name = label_create(card->phone, "", UI_TEXT_BOLD(42),
                                     0xFFFFFFU);
     lv_obj_set_width(card->phone_name, BODY_W);
     lv_label_set_long_mode(card->phone_name, LV_LABEL_LONG_DOT);
 
-    card->phone_number = label_create(card->phone, "", &lv_font_montserrat_36,
+    card->phone_number = label_create(card->phone, "", UI_TEXT(32),
                                       COLOR_PHONE_NO);
     lv_obj_set_width(card->phone_number, BODY_W);
     lv_label_set_long_mode(card->phone_number, LV_LABEL_LONG_DOT);
@@ -184,12 +184,12 @@ static void lyric_create(music_card_t *card, lv_obj_t *body)
     card->lyric = column_create(body, LYRIC_W, 20);
     lv_obj_align(card->lyric, LV_ALIGN_CENTER, 0, 0);
 
-    card->song = label_create(card->lyric, "", &lv_font_montserrat_28,
+    card->song = label_create(card->lyric, "", UI_TEXT_BOLD(28),
                               COLOR_MUSIC);
     lv_obj_set_width(card->song, LYRIC_W);
     lv_label_set_long_mode(card->song, LV_LABEL_LONG_DOT);
 
-    card->lyric_text = label_create(card->lyric, "", &lv_font_montserrat_36,
+    card->lyric_text = label_create(card->lyric, "", UI_TEXT_BOLD(32),
                                     0xFFFFFFU);
     lv_obj_set_width(card->lyric_text, LYRIC_W);
     lv_label_set_long_mode(card->lyric_text, LV_LABEL_LONG_WRAP);
@@ -242,7 +242,7 @@ bool music_card_create(music_card_t *card, lv_obj_t *parent)
 
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       TITLE_H, "MEDIA",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
 
     /* 模板内标题标签是首个子项，抓句柄用于随模式改标题 */
     card->title = lv_obj_get_child(lv_obj_get_parent(content), 0);

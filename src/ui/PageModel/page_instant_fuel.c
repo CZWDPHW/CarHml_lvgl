@@ -59,7 +59,7 @@ bool instant_fuel_card_create(instant_fuel_card_t *card, lv_obj_t *parent)
     /* 标题区 150 高，标题居中（中文受限，用英文） */
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       TITLE_H, "INSTANT FUEL",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
 
     body = ui_blank_container(content);
     lv_obj_set_size(body, BODY_W, BODY_H);
@@ -72,7 +72,7 @@ bool instant_fuel_card_create(instant_fuel_card_t *card, lv_obj_t *parent)
 
     card->value = lv_label_create(body);
     lv_label_set_text(card->value, "0.0 L / 100km");
-    lv_obj_set_style_text_font(card->value, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_font(card->value, UI_GEELY(34), 0);
     lv_obj_set_style_text_color(card->value, lv_color_white(), 0);
     lv_obj_align(card->value, LV_ALIGN_TOP_MID, 0, TEXT_Y);
 

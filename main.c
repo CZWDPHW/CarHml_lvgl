@@ -37,6 +37,22 @@
 #include <signal.h>
 #endif
 
+#include "carmw/car_log_cleanup.h"
+#include "ui/settings/ui_settings_page.h"
+#include "ui/ui_display.h"
+
+#if defined(CARMW_PLATFORM_BOARD)
+static bool settings_cleanup_start(void)
+{
+    return car_log_cleanup_start(CAR_LOG_CLEANUP_ROOT);
+}
+
+static unsigned settings_cleanup_status(void)
+{
+    return (unsigned)car_log_cleanup_status();
+}
+#endif
+
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 720
 #define REFRESH_MS 20  /* 界面刷新周期 */
@@ -52,6 +68,12 @@ static uint64_t s_perf_window_start_ms;
 static uint32_t s_perf_handler_count;
 static uint64_t s_perf_handler_total_us;
 static uint64_t s_perf_handler_max_us;
+static uint64_t s_perf_render_start_us;
+static uint64_t s_perf_render_total_us;
+static uint64_t s_perf_render_max_us;
+static uint32_t s_perf_render_count;
+static uint64_t s_perf_flush_start_us;
+static uint64_t s_perf_flush_total_us;
 static volatile sig_atomic_t s_quit;
 
 static void on_quit_signal(int signo)
@@ -64,9 +86,12 @@ static int ui_should_quit(void)
 {
     return s_quit != 0;
 }
+
 #else
 static car_port_memory_t s_mem;
 static unsigned s_tick;
+/* --settings：设置页验证开关，见 settings_demo_parse_args */
+static bool s_settings_demo;
 /* 演示轮播当前点亮的故障码下标，换码时先把上一盏关掉 */
 static unsigned s_lamp_idx;
 static unsigned s_lamp_has_prev;
@@ -198,7 +223,8 @@ static void fake_mcu_tick(void)
     tick = s_tick / REPORT_EVERY;
 
     {
-        uint16_t speed = (uint16_t)(40U + (tick * 3U) % 120U);
+        uint16_t speed = s_settings_demo ? 0U
+                                         : (uint16_t)(40U + (tick * 3U) % 120U);
         uint16_t rpm = (uint16_t)(900U + (tick * 137U) % 5000U);
         uint8_t speed_rpm[4];
         uint8_t fuel[6];
@@ -247,6 +273,13 @@ static void fake_mcu_tick(void)
             unit[1] = 0x00U;
             unit[2] = 0x00U;
             push_frame(0x39, (uint8_t)CAR_OP_STATUS, unit, 3);
+        }
+
+        /* 设置页演示：上报 0x05 系统设置，time_source=2（仪表） */
+        if(s_settings_demo) {
+            uint8_t sys_setting[5] = {0U, 0U, 0U, 0U, 2U};
+
+            push_frame(0x05, (uint8_t)CAR_OP_STATUS, sys_setting, 5U);
         }
 
         push_frame(0x0B, (uint8_t)CAR_OP_STATUS, doors, 1);
@@ -552,7 +585,7 @@ typedef struct {
     const uint8_t *lamp_codes;
     uint8_t lamp_count;
     bool no_data;            /* true 时不发任何车况帧 */
-} scenario_t;
+} scenario_t;// 场景结构体
 
 static const scenario_t s_scenarios[] = {
     {"normal", 100, 2000, 'D', false, 0, 0, 1, false, false, false, 0,
@@ -606,8 +639,8 @@ static const scenario_t s_scenarios[] = {
      SCENARIO_NO_INJECT, SCENARIO_NO_INJECT, NULL, 0, false},
 };
 
-static const scenario_t *s_scenario;
-static bool s_scenario_error;
+static const scenario_t *s_scenario;// 当前场景指针
+static bool s_scenario_error;// 场景错误标志
 
 /* 把场景固定输入拆成各业务帧，数值与会变化的演示状态无关 */
 static void scenario_push_frames(const scenario_t *sc)
@@ -939,6 +972,23 @@ static void out_temp_parse_args(int argc, char **argv)
     }
 }
 
+/*
+ * --settings：PC 验证设置页专用。假 MCU 车速置 0（满足设置页 speed<5 门控），
+ * 并上报 0x05 系统设置 time_source=2（仪表），使日期页进入 5 列滚轮分支。
+ * 默认演示行为不变。
+ */
+static void settings_demo_parse_args(int argc, char **argv)
+{
+    size_t i;
+
+    for(i = 1; i < (size_t)argc; ++i) {
+        if(strcmp(argv[i], "--settings") == 0) {
+            s_settings_demo = true;
+            fprintf(stderr, "settings demo: speed=0, time_source=INSTRUMENT\n");
+        }
+    }
+}
+
 #endif /* !CARMW_PLATFORM_BOARD */
 
 /* ------------------------------------------------------------------ */
@@ -948,8 +998,9 @@ static void out_temp_parse_args(int argc, char **argv)
 #if !defined(CARMW_PLATFORM_BOARD)
 /*
  * PC 演示：用键盘模拟方向盘按键（板端由真实 0x20 帧驱动同一接口）。
- * ← / ↑ = 上一张卡片，→ / ↓ = 下一张卡片
- * Enter = 23 确定，Backspace/Esc = 13 返回
+ * 设置页可见：←/→/↑/↓ 传方向码（板端短按语义）；
+ * 否则：←/↑ = 上一张卡片，→/↓ = 下一张卡片（板端长按语义）。
+ * Enter = 23 确定（设置页内为 OK，未打开时先打开设置），Backspace = 13 返回。
  */
 static void poll_keys(void)
 {
@@ -959,9 +1010,9 @@ static void poll_keys(void)
         SDL_SCANCODE_UP,   SDL_SCANCODE_DOWN,
         SDL_SCANCODE_RETURN, SDL_SCANCODE_BACKSPACE,
     };
-    static const uint8_t s_code[6] = {
-        UI_KEY_PREV, UI_KEY_NEXT, UI_KEY_PREV, UI_KEY_NEXT,
-        UI_KEY_OK,   UI_KEY_OK, /* 返回键单独处理，见下 */
+    /* 设置页方向码：与 s_sc 前 4 项一一对应 */
+    static const uint8_t s_dir[4] = {
+        UI_KEY_LEFT, UI_KEY_RIGHT, UI_KEY_UP, UI_KEY_DOWN,
     };
     const Uint8 *keys = SDL_GetKeyboardState(NULL);
     uint8_t i;
@@ -973,14 +1024,30 @@ static void poll_keys(void)
         if(now != 0U && s_prev[i] == 0U) {
             ui_key_event_t evt;
 
-            evt.code = s_code[i];
+            evt.code = UI_KEY_OK;
             evt.pressed = 1U;
 
-            if(i == 4U) {
-                /* 23：车速 < 5 时打开设置（未收到速度帧时也允许打开） */
-                if(!ui_app_settings_is_open() &&
-                   (ui_app_settings_speed_ok() || !ui_app_has_data())) {
-                    ui_app_settings_open();
+            if(i < 4U) {
+                /*
+                 * 板端短按方向键在设置页内导航，长按才翻卡；
+                 * PC 无长按，按设置页是否可见区分两种语义。
+                 */
+                evt.code = ui_app_settings_visible()
+                               ? s_dir[i]
+                               : ((i == 0U || i == 2U) ? UI_KEY_PREV
+                                                      : UI_KEY_NEXT);
+                ui_app_handle_key(&evt);
+            }
+            else if(i == 4U) {
+                if(!ui_app_settings_is_open()) {
+                    /* 23：车速 < 5 时打开设置（未收到速度帧时也允许打开） */
+                    if(ui_app_settings_speed_ok() || !ui_app_has_data()) {
+                        ui_app_settings_open();
+                    }
+                }
+                else {
+                    /* 设置页已打开：OK 交给页面（进分类/确认/保存） */
+                    ui_app_handle_key(&evt);
                 }
             }
             else if(i == 5U) {
@@ -1000,6 +1067,10 @@ static void poll_keys(void)
 #endif
 
 /* 33ms 周期刷新：PC 先推进假 MCU 并 pump，再取一次快照交给 UI */
+/**
+ * @brief 刷新定时器回调
+ * @param timer 定时器对象
+ */
 static void refresh_timer(lv_timer_t *timer)
 {
     car_state_view_t view;
@@ -1013,12 +1084,12 @@ static void refresh_timer(lv_timer_t *timer)
     if(s_scenario != NULL) {
         /* 固定场景：只回固定输入，不轮播、不读真实时钟 */
         scenario_tick();
-        car_link_pump(&s_link, 0);
+        car_link_pump(&s_link, 0);// 从场景队列中取出帧
     }
     else {
-        fake_mcu_tick();
-        car_link_pump(&s_link, 0);
-        poll_keys();
+        fake_mcu_tick();// 进推进假 MCU 帧
+        car_link_pump(&s_link, 0);// 从场景队列中取出帧
+        poll_keys();// 处理键盘按键
     }
 #endif
 
@@ -1092,6 +1163,31 @@ static uint64_t perf_now_us(void)
     return (uint64_t)now.tv_sec * 1000000ULL + (uint64_t)now.tv_nsec / 1000ULL;
 }
 
+static void perf_display_event(lv_event_t *event)
+{
+    uint64_t now = perf_now_us();
+    switch(lv_event_get_code(event)) {
+    case LV_EVENT_RENDER_START:
+        s_perf_render_start_us = now;
+        break;
+    case LV_EVENT_RENDER_READY: {
+        uint64_t elapsed = now - s_perf_render_start_us;
+        ++s_perf_render_count;
+        s_perf_render_total_us += elapsed;
+        if(elapsed > s_perf_render_max_us) s_perf_render_max_us = elapsed;
+        break;
+    }
+    case LV_EVENT_FLUSH_START:
+        s_perf_flush_start_us = now;
+        break;
+    case LV_EVENT_FLUSH_FINISH:
+        s_perf_flush_total_us += now - s_perf_flush_start_us;
+        break;
+    default:
+        break;
+    }
+}
+
 static void perf_report(uint64_t now_ms)
 {
     uint64_t elapsed_ms;
@@ -1106,22 +1202,35 @@ static void perf_report(uint64_t now_ms)
         return;
     }
 
-    fprintf(stderr, "perf: handler=%u fps=%.1f avg=%lluus max=%lluus window=%llums\n",
+    fprintf(stderr, "perf: handler=%u handler_hz=%.1f avg=%lluus max=%lluus "
+            "fps=%.1f render_avg=%lluus render_max=%lluus flush_total=%lluus window=%llums\n",
             (unsigned)s_perf_handler_count,
             (double)s_perf_handler_count * 1000.0 / (double)elapsed_ms,
             (unsigned long long)(s_perf_handler_count != 0U ?
                                  s_perf_handler_total_us / s_perf_handler_count : 0U),
             (unsigned long long)s_perf_handler_max_us,
+            (double)s_perf_render_count * 1000.0 / (double)elapsed_ms,
+            (unsigned long long)(s_perf_render_count != 0U ?
+                                 s_perf_render_total_us / s_perf_render_count : 0U),
+            (unsigned long long)s_perf_render_max_us,
+            (unsigned long long)s_perf_flush_total_us,
             (unsigned long long)elapsed_ms);
     s_perf_window_start_ms = now_ms;
     s_perf_handler_count = 0U;
     s_perf_handler_total_us = 0U;
     s_perf_handler_max_us = 0U;
+    s_perf_render_count = 0U;
+    s_perf_render_total_us = 0U;
+    s_perf_render_max_us = 0U;
+    s_perf_flush_total_us = 0U;
 }
 #endif
 
 static void ui_loop(void)
 {
+#if defined(CARMW_PLATFORM_BOARD)
+    s_perf_window_start_ms = perf_now_us() / 1000U;
+#endif
     while(!ui_should_quit()) {
         uint32_t idle;
         struct timespec delay;
@@ -1132,8 +1241,9 @@ static void ui_loop(void)
         idle = lv_timer_handler();
 #if defined(CARMW_PLATFORM_BOARD)
         {
-            uint64_t handler_us = perf_now_us() - handler_start;
-            uint64_t now_ms = handler_start / 1000U;
+            uint64_t handler_end = perf_now_us();
+            uint64_t handler_us = handler_end - handler_start;
+            uint64_t now_ms = handler_end / 1000U;
 
             s_perf_handler_count++;
             s_perf_handler_total_us += handler_us;
@@ -1171,7 +1281,6 @@ int main(int argc, char **argv)
 #if defined(CARMW_PLATFORM_BOARD)
     (void)argc;
     (void)argv;
-
     signal(SIGINT, on_quit_signal);
     signal(SIGTERM, on_quit_signal);
     car_port_posix_attach(&s_port, &s_posix, SERIAL_DEVICE, SERIAL_BAUD);
@@ -1191,6 +1300,7 @@ int main(int argc, char **argv)
 
     car_color_parse_args(argc, argv);
     out_temp_parse_args(argc, argv);
+    settings_demo_parse_args(argc, argv);
 #endif
 
     if(!car_link_init(&s_link, &s_port)) {
@@ -1210,14 +1320,19 @@ int main(int argc, char **argv)
     lv_init();
 
 #if defined(CARMW_PLATFORM_BOARD)
-    display = lv_linux_fbdev_create();
+    display = lv_linux_fbdev_create();// 创建 fbdev 显示设备
 
-    if(display == NULL || lv_linux_fbdev_set_file(display, "/dev/fb0") != LV_RESULT_OK) {
+    if(display == NULL || lv_linux_fbdev_set_file(display, "/dev/fb0") != LV_RESULT_OK) {// 设置 fbdev 显示设备文件
         fprintf(stderr, "fbdev init failed: /dev/fb0\n");
         car_link_stop(&s_link);
         car_link_deinit(&s_link);
         return 1;
     }
+    ui_display_require_opaque_xrgb(display);// 要求显示设备为透明 XRGB 格式
+    lv_display_add_event_cb(display, perf_display_event, LV_EVENT_RENDER_START, NULL);
+    lv_display_add_event_cb(display, perf_display_event, LV_EVENT_RENDER_READY, NULL);
+    lv_display_add_event_cb(display, perf_display_event, LV_EVENT_FLUSH_START, NULL);
+    lv_display_add_event_cb(display, perf_display_event, LV_EVENT_FLUSH_FINISH, NULL);
 #else
     display = lv_sdl_window_create(WINDOW_WIDTH, WINDOW_HEIGHT);
 
@@ -1233,7 +1348,7 @@ int main(int argc, char **argv)
 
 #if defined(CARMW_PLATFORM_BOARD)
     /* 本地设置：启动时读入内存，之后运行期只改内存，ACC 关闭时统一落盘 */
-    if(!car_settings_load(&s_settings, CAR_SETTINGS_DEFAULT_PATH)) {
+    if(!car_settings_load(&s_settings, CAR_SETTINGS_DEFAULT_PATH)) {// 加载本地设置
         fprintf(stderr, "car_settings_load failed: %s, 使用默认设置\n",
                 CAR_SETTINGS_DEFAULT_PATH);
     }
@@ -1244,28 +1359,29 @@ int main(int argc, char **argv)
                 s_settings.values.dial_style,
                 (unsigned long)s_settings.values.center_card_mask);
     }
-    if(!car_settings_saver_start(&s_settings_saver, &s_settings)) {
+    if(!car_settings_saver_start(&s_settings_saver, &s_settings)) {// 启动本地设置保存器
         fprintf(stderr, "car_settings_saver_start failed\n");
         car_link_stop(&s_link);
         car_link_deinit(&s_link);
         return 1;
     }
 #else
-    car_settings_reset(&s_settings);
+    car_settings_reset(&s_settings);// 重置本地设置
 #endif
-    car_settings_set_notify(&s_settings, settings_changed, NULL);
+    car_settings_set_notify(&s_settings, settings_changed, NULL);// 设置本地设置变更通知回调
 
-    if(!ui_app_init()) {
+    if(!ui_app_init()) {// 初始化 UI 应用
         fprintf(stderr, "ui_app_init failed\n");
         return 1;
     }
-    ui_app_settings_set_settings(&s_settings);
-    ui_app_settings_set_cmd_cb(settings_send_cmd);
+    ui_app_settings_set_settings(&s_settings);// 设置 UI 应用本地设置
+    ui_app_settings_set_cmd_cb(settings_send_cmd);// 设置 UI 应用命令回调
 #if defined(CARMW_PLATFORM_BOARD)
-    ui_app_settings_set_pending_cb(settings_pending);
+    ui_app_settings_set_pending_cb(settings_pending);// 设置 UI 应用待办回调
+    ui_settings_page_set_cleanup_cb(settings_cleanup_start, settings_cleanup_status);
 #endif
 
-    if(!ui_app_set_style(settings_start_style())) {
+    if(!ui_app_set_style(settings_start_style())) {// 设置 UI 应用样式
         fprintf(stderr, "ui_app_set_style failed\n");
         return 1;
     }
@@ -1287,7 +1403,7 @@ int main(int argc, char **argv)
     }
 #endif
 
-    s_refresh_timer = lv_timer_create(refresh_timer, REFRESH_MS, NULL);
+    s_refresh_timer = lv_timer_create(refresh_timer, REFRESH_MS, NULL);// 创建刷新定时器
 
 #if defined(CARMW_PLATFORM_BOARD)
     printf("carmw UI demo: fbdev /dev/fb0 + %s@%d, Ctrl+C 退出\n",
@@ -1296,6 +1412,7 @@ int main(int argc, char **argv)
     printf("carmw UI demo: %dx%d, 关闭窗口退出\n", WINDOW_WIDTH, WINDOW_HEIGHT);
 #endif
     ui_loop();
+    car_log_cleanup_shutdown();
 
 #if defined(CARMW_PLATFORM_BOARD)
     /* 关闭顺序：停 UI 定时器 -> 补存设置 -> join 收帧线程 -> 关串口 -> 销毁 UI */

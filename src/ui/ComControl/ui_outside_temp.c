@@ -4,7 +4,7 @@
  * Qt 换算：outsideTempC = (raw - 0x7C) × 0.5
  * 特殊值：0xFF 隐藏 / 0xFE 显示 --.- / 0xFC 显示 E
  *
- * 中文字库未就绪，Qt 的 ℃/℉ 用 "°C"/"°F" 占位（montserrat 已含 0xB0）。
+ * 单位显示 "°C"/"°F"；Bebas 28 字库合入同字号的度数符号，供英文模式使用。
  */
 #include "ui/ComControl/ui_outside_temp.h"
 

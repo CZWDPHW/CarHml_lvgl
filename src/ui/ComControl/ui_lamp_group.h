@@ -47,6 +47,13 @@ typedef enum {
     UI_LAMP_GATE_LANE_DEPARTURE,    /* Qt laneDepartureWarning，黄图条件 carState > 1 */
     UI_LAMP_GATE_XMODE,             /* Qt IconXMode：drive_mode 6/7/8 依次选第 1/2/3 张图 */
     UI_LAMP_GATE_SPEED_SET_OK,      /* Qt IconSet：cruise_state bit1 为真时点亮 */
+    /*
+     * Qt 森林人自动启停灯位：visible: originalCarId!==NissanXTrail16 &&
+     * enableAutoStop，本工程取工厂功能位 bit10（与设置页可见位同一张位图）。
+     * 车型条件无法等价（本工程没有车型语义枚举），恒按非 XTrail16 处理。
+     * 该门控的闪烁节奏也与整组不同：快闪 300ms / 慢闪 3000ms。
+     */
+    UI_LAMP_GATE_AUTO_STOP,
 } ui_lamp_gate_t;
 
 /* 样式层提供的单灯配置：绝对坐标 + 图标变体表 */

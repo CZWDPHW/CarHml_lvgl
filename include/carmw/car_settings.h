@@ -3,7 +3,7 @@
  *
  * 设计约束（对齐 docs/UI_REWRITE_HANDOFF.md 14.5）：
  *   - 启动读一次配置文件到内存，运行期只改内存并标 dirty，不周期写盘；
- *   - MCU 反馈状态、工厂菜单可见性、运行时 UI 状态都不属于本模块；
+ *   - 工厂菜单可见性独立持久化；MCU 反馈状态与运行时 UI 状态不属于本模块；
  *   - 保存由调用方在 ACC 由开转关时触发，硬件侧约定关闭后留 3 秒供电；
  *   - 写文件用临时文件 + fsync + rename 原子替换，失败保留 dirty。
  *
@@ -38,35 +38,46 @@ typedef enum {
 
 /* 首批字段：6.0 冻结完整清单后在此扩展，未列入的项不得在 UI 里另建存储 */
 typedef struct {
-    uint8_t unit_mileage;                        /* car_unit_system_t */
-    uint8_t unit_temperature;                    /* car_unit_system_t */
-    uint8_t dark_mode;                           /* 0 日间 / 1 夜间 */
-    char dial_style[CAR_SETTINGS_STYLE_MAX];     /* 样式注册表里的 id */
-    uint32_t center_card_mask;                   /* 中心卡片可见位图，0 表示全部关闭 */
+    uint8_t unit_mileage;                        // 里程单位
+    uint8_t unit_temperature;                    // 温度单位
+    uint8_t dark_mode;                           // 0 日间 / 1 夜间
+    char dial_style[CAR_SETTINGS_STYLE_MAX];     // 样式注册表里的 id
+    uint32_t center_card_mask;                   // 中心卡片可见位图，0 表示全部关闭
     /* 行车信息显示开关，对应 Qt SettingsMgr 的同名字段 */
-    uint8_t out_temperature;                     /* OutTemperatureOnOff，缺省关 */
-    uint8_t gear_on;                             /* gearOnOff，缺省开 */
-    uint8_t avg_fuel_on;                         /* avgFuelOnOff，缺省关 */
+    uint8_t out_temperature;                     // OutTemperatureOnOff，缺省关
+    uint8_t gear_on;                             // gearOnOff，缺省开
+    uint8_t avg_fuel_on;                         // avgFuelOnOff，缺省关
     /* 常规设置：Qt PageGeneralSettings 的本地字段 */
-    uint8_t daylight;                            /* daylightvalue，0~100，缺省 100 */
-    uint8_t nightlight;                          /* nightlightvalue，0~100，缺省 100 */
-    uint8_t speed_limit_on;                      /* speedlimitOnOff，缺省关 */
+    uint8_t daylight;                            // daylightvalue，0~100，缺省 100
+    uint8_t nightlight;                          // nightlightvalue，0~100，缺省 100
+    uint8_t speed_limit_on;                      // speedlimitOnOff，缺省关
     /* ECO 设置：Qt EcoSettings 的本地字段 */
-    uint8_t eco_indicator;                       /* ecoindicator，缺省开 */
+    uint8_t eco_indicator;                       // ecoindicator，缺省开
     /*
      * ecoOrfuel：ECO 卡显示形态。1 = 油门引导（圆环），0 = 油耗（水平刻度）。
      * Qt：showCircularMode = ecoIndicator && ecoOrfuel && ecoEnable。
      */
-    uint8_t eco_or_fuel;
+    uint8_t eco_or_fuel;// ECO 卡显示形态
     /*
      * ECO 历史：Qt EcoavgShow.historyModel 的最近 4 次平均油耗（×10，0.1 l/100km）。
      * 索引 0 最旧、3 最新；0 表示该项空（Qt resetAllData 把 val 置 0）。
      */
-    uint16_t eco_history_x10[CAR_SETTINGS_ECO_HISTORY_SLOTS];
+    uint16_t eco_history_x10[CAR_SETTINGS_ECO_HISTORY_SLOTS];// ECO 历史记录（×10，0.1 l/100km）
     /* 雷达显示开关：Qt SettingsMgr.radaronoff（名字取反，实为“雷达开启”），缺省开 */
-    uint8_t radar_on;
+    uint8_t radar_on;// 雷达显示开关
     /* 四驱灯/提示可见性：Qt SettingsMgr.show4h，缺省关 */
-    uint8_t show_4h;
+    uint8_t show_4h;// 四驱灯/提示可见性
+    uint32_t car_color_rgb;                     /* Qt #004a6b */
+    uint8_t right_hand_drive;                   /* Qt isRightHand=false */
+    uint8_t connect_enabled;// 连接开关
+    uint8_t connect_mode;                       /* 0 Android Auto / 1 CarPlay / 2 HiCar */
+    uint8_t animation_style;                    /* Qt BootAnimation/animationStyle，0~1 */
+    uint8_t language;                           /* Qt stable IDs 0..18; implemented 0/1 */
+    uint16_t factory_features;                  /* visibility only, never MCU status */
+    uint8_t tire_on;// 轮胎开关
+    uint8_t door_on;// 门开关
+    uint8_t fuel_filler_right;// 油量填充器开关（右）
+    uint8_t fuel_tank;// 油量开关
 } car_settings_values_t;
 
 /*
@@ -95,17 +106,20 @@ typedef struct {
 #define CAR_SETTINGS_CHANGED_ECO_OR_FUEL (UINT32_C(1) << 13)
 #define CAR_SETTINGS_CHANGED_RADAR (UINT32_C(1) << 14)
 #define CAR_SETTINGS_CHANGED_SHOW_4H (UINT32_C(1) << 15)
+#define CAR_SETTINGS_CHANGED_APPEARANCE (UINT32_C(1) << 16)
+#define CAR_SETTINGS_CHANGED_ANIMATION (UINT32_C(1) << 17)
+#define CAR_SETTINGS_CHANGED_CONNECT (UINT32_C(1) << 18)
 
 typedef void (*car_settings_notify_t)(void *user, uint32_t changed_mask);
 
 typedef struct {
-    car_settings_values_t values;
+    car_settings_values_t values;// 本地设置值
     uint64_t saved_version;          /* 已成功落盘的版本号 */
     uint64_t version;                /* 每次变更 +1 */
-    char path[192];
-    char tmp_path[196];
-    car_settings_notify_t notify;
-    void *notify_user;
+    char path[192];// 存储路径
+    char tmp_path[196];// 临时存储路径
+    car_settings_notify_t notify;// 变更通知回调
+    void *notify_user;// 变更通知回调用户数据
     bool loaded;                     /* 已尝试过读取（含文件不存在） */
 } car_settings_t;
 
@@ -146,6 +160,12 @@ bool car_settings_set_eco_or_fuel(car_settings_t *settings, bool throttle_guide)
 /* 雷达开关与四驱显示：值为 0/1，未变化返回 false */
 bool car_settings_set_radar_on(car_settings_t *settings, bool on);
 bool car_settings_set_show_4h(car_settings_t *settings, bool on);
+bool car_settings_set_appearance(car_settings_t *settings, uint32_t rgb, bool right_hand);
+bool car_settings_set_animation_style(car_settings_t *settings, uint8_t style);
+bool car_settings_set_connect(car_settings_t *settings, bool enabled, uint8_t mode);
+bool car_settings_set_language(car_settings_t *settings, uint8_t language);
+bool car_settings_set_factory(car_settings_t *settings, uint16_t features,
+                              bool tire, bool door, bool filler_right, uint8_t tank);
 
 /*
  * ECO 历史（Qt EcoavgShow）：

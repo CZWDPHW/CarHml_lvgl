@@ -9,6 +9,7 @@
 
 #include "ui/ui_common.h"
 #include "ui/ui_theme.h"
+#include "ui/ui_assets.h"
 
 #define DOOR_X   620
 #define DOOR_Y   100
@@ -82,6 +83,7 @@ void ov_door_apply(ov_door_t *ov, const car_state_t *state, bool suppressed)
 {
     uint8_t bits = 0U;
     uint8_t show;
+    bool mirrored = true;
 
     if(ov == NULL || state == NULL) {
         return;
@@ -113,11 +115,23 @@ void ov_door_apply(ov_door_t *ov, const car_state_t *state, bool suppressed)
         bits |= ST_SHOW;
     }
 
+    if(state->right_hand_drive) {
+        bits = (uint8_t)((bits & 0xF0U) | ((bits & 0x05U) << 1) |
+                         ((bits & 0x0AU) >> 1) | 0x40U);
+    }
+    if(((bits ^ ov->last_state) & 0x40U) != 0U || ov->last_state == 0xFFU) {
+        /* Qt mirror around width=590, then Translate(100): 620+590+100-720. */
+        lv_obj_set_x(ov->root, state->right_hand_drive ? 590 : DOOR_X);
+        for(uint32_t i = 0; i < lv_obj_get_child_count(ov->root); ++i) {
+            if(!ui_assets_mirror_image(lv_obj_get_child(ov->root, i),
+                                       state->right_hand_drive, 0, 0, DOOR_W, DOOR_H)) mirrored = false;
+        }
+    }
     if(bits == ov->last_state) {
         return;
     }
 
-    ov->last_state = bits;
+    ov->last_state = mirrored ? bits : 0xFFU;
     ov->active = show;
 
     set_visible(ov->root, show);

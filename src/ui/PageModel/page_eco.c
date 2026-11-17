@@ -176,18 +176,18 @@ static void circular_create(eco_card_t *card, lv_obj_t *body)
 
     score_title = lv_label_create(row);
     lv_label_set_text(score_title, "ECO SCORE");
-    lv_obj_set_style_text_font(score_title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(score_title, UI_TEXT(14), 0);
     lv_obj_set_style_text_color(score_title, lv_color_hex(COLOR_ECO), 0);
 
     card->score = lv_label_create(row);
     lv_label_set_text(card->score, "0");
-    lv_obj_set_style_text_font(card->score, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(card->score, UI_TEXT(24), 0);
     lv_obj_set_style_text_color(card->score, lv_color_white(), 0);
 
     /* 底部平均油耗：离底 30 */
     card->avg = lv_label_create(card->circular);
     lv_label_set_text(card->avg, "AVG 0.0 L/100KM");
-    lv_obj_set_style_text_font(card->avg, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(card->avg, UI_TEXT(18), 0);
     lv_obj_set_style_text_color(card->avg, lv_color_white(), 0);
     lv_obj_set_style_text_opa(card->avg, AVG_TEXT_OPA, 0);
     lv_obj_align(card->avg, LV_ALIGN_BOTTOM_MID, 0, -30);
@@ -222,18 +222,18 @@ static void horizontal_create(eco_card_t *card, lv_obj_t *body)
 
     label = lv_label_create(row);
     lv_label_set_text(label, "AVG");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(label, UI_TEXT(22), 0);
     lv_obj_set_style_text_color(label, lv_color_white(), 0);
     lv_obj_set_style_pad_bottom(label, 4, 0);
 
     card->h_avg = lv_label_create(row);
     lv_label_set_text(card->h_avg, "0.0");
-    lv_obj_set_style_text_font(card->h_avg, &lv_font_montserrat_44, 0);
+    lv_obj_set_style_text_font(card->h_avg, UI_TEXT_BOLD(42), 0);
     lv_obj_set_style_text_color(card->h_avg, lv_color_white(), 0);
 
     unit = lv_label_create(row);
     lv_label_set_text(unit, "L/100km");
-    lv_obj_set_style_text_font(unit, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(unit, UI_TEXT(18), 0);
     lv_obj_set_style_text_color(unit, lv_color_white(), 0);
     lv_obj_set_style_pad_bottom(unit, 6, 0);
 
@@ -280,7 +280,7 @@ static void horizontal_create(eco_card_t *card, lv_obj_t *body)
 
         label = lv_label_create(scale);
         lv_label_set_text_fmt(label, "%u", (unsigned)s_big[i]);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(label, UI_TEXT(20), 0);
         lv_obj_set_style_text_color(label, lv_color_white(), 0);
         lv_obj_align_to(label, tick, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
     }
@@ -312,7 +312,7 @@ bool eco_card_create(eco_card_t *card, lv_obj_t *parent)
 
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       TITLE_H, "FUEL ECONOMY",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
 
     body = ui_blank_container(content);
     lv_obj_set_size(body, BODY_W, BODY_H);

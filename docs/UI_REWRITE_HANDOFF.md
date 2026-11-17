@@ -17,7 +17,7 @@
 
 | 项 | 结论 |
 |---|---|
-| 复刻范围 | Style1 主仪表 + 中心卡片 + 覆盖层（六阶段）；设置体系/CarPlay/升级后置 |
+| 复刻范围 | Style1 主仪表 + 中心卡片 + 覆盖层（六阶段）；设置体系/CarPlay后置 |
 | 目录与命名 | 镜像 Qt 的 QML 组件树（`PageModel/`、`SpeedDial/`、`RotationDial/` 等） |
 | 样式可切换 | 一级架构约束。每个样式独立 `.c`，公共层禁止出现样式名判断 |
 | 通用控件 | 所有样式共用的控件放 `ComControl/`，命名用 `ui_` 前缀，不带样式名 |
@@ -116,6 +116,141 @@ src/ui/
 
 ## 3. 已完成进度
 
+### 2026-11-12 本批接续记录（优先于历史状态）
+
+**2026-11-13 全场景中文化（仪表本体，已完成）**
+
+- 目标：设置页已有的中英切换扩展到仪表本体（Forester1 主表盘、10 张中心卡片、提示覆盖层），中文取 `car_settings.values.language == 0`，英文为其它值；单位符号（km/h、L/100km、mpa、kpa、MPG 等）与品牌/数值保持原样。
+- 新增 `src/ui/ui_i18n.h/.c`：全局语言标志、`words[][2]` 词库（最长匹配 + 与设置页相同的边界规则）、递归遍历 `lv_label_class`、per-label 事件缓存（原文 + 原字体 + CJK 子集字体 + `translated_shown` 标志）并在 `LV_EVENT_DELETE` 释放；中文时标签文本等于缓存译文直接返回，英文时恢复原文与原字体。
+- 字库：`tools/settings_font.py` 扩展为从 `ui_i18n.c` 收集全部非 ASCII 字符，生成 14/18/20/22/24/28/36 七份子集（`src/ui/ui_i18n_cjk_*.c`）；44/46/48 映射到 36；缺字时回退英文原字体，不画方块。两份 `lv_conf` 沿用已启用的 `LV_USE_FONT_COMPRESSED=1`。
+- 接线 `ui_app.c`：`i18n_sync()` 在 `ui_app_set_style()`（强制）、`ui_app_apply()`（逐帧）、`ui_app_settings_refresh()`（强制）调用；语言未变化时中文模式仍每帧补一次翻译，因为页面 apply 会用英文重写动态标签；`ui_app_deinit()` 重置就绪标志，样式重建后重新检测语言。设置覆盖层仍由 `ui_settings_translate()` 独立处理，两套翻译互不修改对方对象。
+- 词库覆盖：卡片标题（SHORT TERM/TIRE PRESSURE/FUEL ECONOMY/ECO SCORE/INSTANT FUEL/CHASSIS/ITINERARY/CONNECT/MEDIA/FM RADIO/GeneralUi1）、短期行程四行、`AVG`、主表盘 `ODO:`/`RANGE:`/`Trip:`/`Trip A:`/`Trip B:`、互联卡片整句与模式/蓝牙前缀、占位页 `SPEED:`/`RPM:`、横幅 `LOW FUEL!`/`SHIFT TO P, STAY SAFE!`/`WARNING`/`PARK/START`/`FAULT`/`SEE USER MANUAL`，以及 `ov_tips` 的 40 余条警示整句。
+- 回归：新增 `tests/test_i18n.c`（翻译/字体映射/重复 apply 稳定/页面重写英文后再翻译/切回英文恢复原文与 Montserrat 字体/整句警示），`CMakeLists.txt` 注册 `carmw_i18n`。PC clean build 退出 0，CTest **9/9 通过**；AArch64 BOARD clean build 退出 0。
+- PC 视觉验证（SDL 离屏快照，非板端）：中文主表盘 ODO/RANGE/Trip 前缀与中心卡片标题/行文本均为中文，切回英文后原文与原字体完全恢复；临时验证程序与截图放在 `/tmp`，未纳入仓库。
+- 边界：静态子集只覆盖词库中出现的汉字；MCU 下发的车型名、设备名、媒体歌词等外部字符串不做翻译；`set` 徽标、`km/h`、`x1000/min`、F/E/H/C、`KM/MI` 等单位按 Qt 保持原样。板端字号/行高与长中文溢出仍需实机视觉验收。
+- 下一步：板端部署后检查主表盘与各卡片中文排版（尤其 `小计里程 A:` 与右侧 Trip 长文本）、切换耗时与峰值内存；如需外部中文字符串，再评估 TinyTTF/FreeType 方案。
+
+本批继续已有未提交工作，核对日期/互联回归并补齐 Forester1 右舵显示验证。整体仍在阶段 6.3～6.5 收尾，不能标记“全部设置迁移完成”。工作区修改尚未提交，接手时先检查 git diff，保留已有实现，不从旧版本重新覆盖。
+
+| 设置项 | 当前状态 | 下次工作 |
+|---|---|---|
+| 转向灯、雨刷、保养及工厂门控车辆项 | 已有页面、协议命令及回读实现，见 14.9 | 保留现有修改，继续整体验证及板端核对 |
+| 开机动画 | 配置入口、多选确认/取消、26 短按循环、ACC 保存已实现；默认 animation_style=0 | 实际播放器未接入，保持 CONFIG ONLY / PLAYER UNAVAILABLE 提示 |
+| 日期时间 | 已按 Qt 重做滚轮（5 列、确认、时间制式/时间源/返回）、`scale 0.8→1` 动画、0 基草稿与日期校验、中文文案；保存时同步 Linux 系统时间与 RTC（板端）；命令/回读回归通过 | 板端字号/行高/裁剪视觉验收与 root 权限实测待做 |
+| 互联设置 | 开关、模式持久化、设备名称及模式标签即时刷新已实现并纳入回归 | 真实连接仍需 ZLink SDK，保持 SDK UNAVAILABLE / CONFIG ONLY，不能宣称可投屏 |
+| 车色 | 持久配置已注入 UI 快照并复用中央车身蒙版染色 | Qt Forester 无车色入口，未擅自开放；板端视觉仍待核对 |
+| 右舵 | Forester1 小车门、大车门、中央车模局部镜像及设置即时刷新已接线并补回归 | 不翻转文字或整屏；板端视觉、峰值内存和切换耗时仍待实测 |
+| 语言、工厂设置 | 中英切换、持久化、1688 密码、工厂主菜单与 11 位功能配置已实现并通过回归；仪表本体（主表盘/中心卡片/提示覆盖层）已由 `ui_i18n` 接入中英切换（2026-11-13） | 数据调试/LOGO 不可用；倒车侧预警已有普通入口；自动启停 Qt 无普通入口，已迁移 bit10 对底部灯位（27/219/28）的可见性门控与 300ms/3000ms 闪烁；GPWS 之外的车型条件行未迁移；板端视觉、中文长文本溢出及真实 MCU 验收待完成 |
+| 清缓存 | 已实现日志专用后台清理、确认/取消与反馈 | 仅 `/opt/car_dashboard/log` 内容；PC 默认不可用；专用日志目录部署与板端验收仍待核对，见下文 |
+
+**2026-11-12 语言与工厂接续实现（优先于下方历史验证）**
+
+- 设置界面支持 0 简体中文、1 英文动态切换及 ACC 关闭保存；0..18 保持 Qt 顺序，2..18 明确不支持、不写配置。英文为兼容旧配置的默认值。翻译按标签保存原文，切回英文可恢复原标签及字体；中文使用 24px 子集（仪表本体已于 2026-11-13 通过 `ui_i18n` 扩展到 14/18/20/22/24/28/36 多字号，见上方小节）。MCU 车型名称、版本字符串、设备名称原样显示，不承诺任意外部中文字形。
+- `tools/settings_font.py` 从实际翻译表收集全部非 ASCII 字符，以 `lv_font_conv@1.5.3` 和宿主 DroidSansFallbackFull.ttf 生成 `ui_settings_cjk.c`；已生成源纳入构建，普通构建不需要 npm 或宿主字体。Droid 字体版权为 Google Corp. 2006–2010，Apache-2.0，来源 `/usr/share/doc/fonts-droid-fallback/copyright`，发布派生字体时须携带 Apache-2.0 许可。
+- 工厂入口验证 1688；左右选位、上下修改数字、OK 下一位/确认，退出设置清除解锁与数字草稿。主菜单含六位总里程、57/69L 油箱、数据调试、胎压、真实车型列表、11 项功能可见性、车门、雷达、四驱、加油口、右舵、LOGO 和确认返回。车型只使用有效协议回读列表（协议最多 10 项），无列表显示不可用，无伪造车型。
+- 总里程、油箱、车型、雷达和加油口复用现有命令构造器；无命令回调不发送、不假成功。发送请求不等于 MCU 生效；里程与车型不伪造本地回读。胎压/车门目前控制 Forester1 大覆盖层，四驱与右舵复用原显示配置；加油口持久化并发送命令，森林人油量的方向图标已于 2026-11-12 补上（见下方加油口方向图标小节）。
+- 11 位独立可见性配置不会清零 MCU 状态；已迁移的普通设置入口按位隐藏并跳过。自动启停目前没有普通设置入口（Qt 侧同样没有），在工厂页标注 CONFIG ONLY；bit10 已接线到森林人底部自动启停灯位可见性，见下方 2026-11-12 自动启停灯位小节（EPS、倒车侧预警、驻车辅助/底盘控制已于 2026-11-12 补普通入口，见下方小节）。数据调试、LOGO 无平台适配，明确不可用。隐藏绝对定位行可能留空隙；中文统一 24px、长名称及板端视觉仍需实机验收。
+- 本次最终 PC clean build 退出 0，CTest **7/7 通过**（29.81 秒）；AArch64 BOARD clean build 退出 0；`git diff --check` 通过。新增回归覆盖中英切换、17 种不支持语言、中文字形、持久化、错误/正确密码、11 位独立配置、六位里程与油箱命令载荷、车型末项与无数据、无平台雷达操作。原测试中的 mkdtemp 声明及路径截断警告仍存在。
+- 全程仅内存捕获命令，配置测试写入独立临时目录；没有真实发送设备命令、修改宿主里程、部署或重启。保留此前日志清理和其他未提交改动。
+
+**2026-11-12 二级菜单空白故障修复**
+
+- PC 无窗口对象几何复现确认：`list_center()` 用 translate_y 平移固定高度列表，同时移动裁剪矩形，后部行即便文本和 HIDDEN 状态正确仍不可见；新增 20 行语言/工厂页复用了旧错误，放大故障。“我的座驾”未选中值 0xFF 被当作 255 行，整列上移 15145px。两处基础错误在 HEAD 已存在，不能归因于新增中文字库；新增页面缺少几何回归使问题漏检。
+- 改用 `lv_obj_scroll_to_y()` 滚动内容，保持视口固定，统一将 NONE 按第 0 行定位；body 原 y=160、高370 超出504高根面板26px，改为剩余344px，避免末行返回文字继续被根面板裁掉。未改菜单父节点、字体或用户现有业务修改。
+- 新回归实际更新 LVGL 布局，检查文本非空、尺寸、所有祖先显隐与逐级裁剪交集及完整文字高度，覆盖中英文、五个分类、我的座驾初始未选中及逐行、系统逐行、20行语言长列表。首轮修复前2196检查/158失败；仅改滚动后剩4个末行裁剪失败，修正body后2196检查/0失败；随后扩展分类覆盖。
+- 最终 PC clean build 退出0，CTest 7/7通过（25.19秒），其中按键及菜单回归2526检查、0失败；BOARD clean build退出0，`file`确认产物为ARM aarch64 ELF，`git diff --check`通过。构建仍有第三方 `lv_opengles_shader.c` 原始字符串相关编译警告，不影响本次构建成功；未部署。
+- 根节点仍直接挂在 ui_app 舞台且打开时置前；翻译递归不修改显隐/父节点，标签原文随对象删除释放，中文静态子集字体没有提前释放。未访问板子，尚不能证明用户报告的所有页面空白均由上述已复现路径覆盖，需板端复测。
+- 用户已确认板端 `/usr/share/fonts` 有中文字体。当前两份 lv_conf 均未启用 FreeType/TinyTTF（默认0），CMake没有FreeType依赖；因此字体目录不会自动加载。仓库有内置TinyTTF，可无需新增外部库，但文件接口使用LVGL文件系统，当前A盘根为 `./assets`，不能直接把Linux绝对路径当A盘路径。尚缺板端实际字体的完整文件路径和格式（TTF/OTF/TTC及集合字面），本轮保留子集字体，不猜文件名或引入未验证的板端库。最少请提供一个实际中文字体的完整路径及 `file` 识别结果。
+
+**2026-11-12 第三级中文页面全黑故障修复**
+
+- 实际离屏绘制复现：`ui_settings_cjk.c` 的 `bitmap_format=1` 为压缩字库，但 PC/BOARD 两份配置均未启用 `LV_USE_FONT_COMPRESSED`。LVGL 获取描述成功、获取位图却返回 NULL，并报告 `Compressed fonts is used but LV_USE_FONT_COMPRESSED is not enabled`；中文模式整个设置字体（含 ASCII）都无法绘制，第三级隐藏分类图标后只剩黑色面板。此前对象几何检查无法覆盖此问题。
+- 两份配置均增加 `LV_USE_FONT_COMPRESSED=1`。`check_label_glyphs()` 扩展为获取 A8 解压位图并检查非零像素，避免仅凭字形描述判定可显示。
+- Windows MinGW 原生离屏复现修复前空面板、修复后行车信息中文标题/三项开关/返回均可见；定向运行现有语言/工厂及菜单几何用例，3307 检查、0 失败。测试辅助构建在 `.cache/settings-visibility`，使用 PC 配置关闭 SDL；仅为本地链接适配了设置文件系统及计时接口，定向用例不执行这些持久化接口。修复前后截图及日志保存在同目录。
+- 本轮未重新构建 Linux PC 或 AArch64 BOARD，也未部署；编译虚拟机 SSH 密钥认证不可用。现有 `build_board/bin/carmw_ui_demo` 仍是本次修复之前的程序，必须重编后替换才能在板端生效。本轮没有全量 CTest 通过的结论。
+
+**2026-11-12 ADB 实机：中英文菜单透明故障修复（优先于上方字体修复结论）**
+
+- 用户已重新编译并替换字库修复版，板端仍然中英文均不可见，且顶部图标尚在时下方列表已不可见；字库解压不是此现象的完整原因。
+- ADB 设备 `0c00106515c1c782553`，应用 `/opt/car_dashboard/carmw_ui_demo`。`fbset` 实测可见分辨率 1920×860、虚拟高度1720、32bpp、RGBA 8/16,8/8,8/0,8/24；驱动实际选 XRGB8888，而非配置默认的RGB565。旧板端程序 MD5 `6724723b3c8602d32a353822b1d81583` 与本地旧产物一致。
+- 在 UI 线程刷新断点调用菜单导航并直接抓 `/dev/fb0`：颜色通道有完整菜单，但三级英文检查区域5974个亮色文字像素全部 Alpha<128。NEON XRGB 混合允许 X 字节为0，硬件显示层却将该字节作为 Alpha，因此屏幕文字透明；此前截图强制 Alpha=255及对象几何测试均掩盖此问题。
+- 新增 `ui_display_require_opaque_xrgb()`，BOARD fbdev 初始化后注册 `LV_EVENT_FLUSH_START`，仅对最终 XRGB8888 显示缓冲将 X 字节置255并 flush cache；不改字体、菜单状态机、LVGL第三方源码或 ARGB8888 透明图层。保留 NEON 加速。
+- `test_display.c` 覆盖 partial/direct/full、窄矩形、含stride的逐行处理、RGB不变及ARGB透明值保留。PC原生18次flush零失败；Linux PC构建成功，CTest8/8通过41.46秒，后续测试改为检查RGB逐字节保持（避免NEON不同舍入导致假失败）后单独重跑display通过；真实AArch64/NEON板端18次flush零失败。BOARD clean build成功，第三方shader原有字符串编译警告仍在。
+- 已部署并启动新程序，MD5 `5197dee79dcbb1996e557466c40f6212`。实机二级/三级中英文各抓一帧：文字亮色像素分别2790/1725/6007/3410，非255 Alpha数量均为0。截图/原始帧、GDB脚本和编译测试日志在 `.cache/settings-visibility`；这四帧通过临时内存修改语言/视图取得，未执行车辆设置命令。旧程序备份 `/opt/car_dashboard/carmw_ui_demo.before_xrgb_20261112`；退出测试程序后已恢复测试前设置文件 `/opt/car_dashboard/setting.cfg.before_xrgb_20261112`，保留原单位/开关，不把测试值落盘；新进程通过setsid运行，日志 `/tmp/settings-fixed-runtime.log`。
+- 用户实际屏幕的最终目视确认仍待反馈；不能用framebuffer像素检查替代整个硬件显示链验收。继续复测时使用同一ADB连接，勿再按16位显示路径推断。
+
+**2026-11-12 日志清理接续实现**
+
+- 新增 `car_log_cleanup.c/.h`，通过受控平台回调启动 pthread 后台任务，UI 展示清理中、成功、失败/部分清理、平台不可用。进入确认页默认选取消，返回不启动任务；运行中不重复启动，退出 join。
+- BOARD 固定根目录 `/opt/car_dashboard`，只删除其 `log` 子目录内容，保留根目录、log 本身、setting.cfg、资源、业务数据以及全部 MD5。Qt 非 debug 分支删除 `/opt/car/bin.md5` 和 `/opt/car/car_dashboard_hml.md5`，这两个文件参与 Qt 升级判定，本工程不沿用此副作用。未调用 LVGL 图片缓存清理。
+- 路径逐级 `openat(O_NOFOLLOW)`；拒绝相对路径、根路径和点组件，不跟随日志目录或内容中的符号链接（内容中的链接仅删除链接本身），不跨不同设备挂载，特殊文件/超深目录报告失败。根目录由平台策略提供，不接受 UI 路径输入；目录应由应用管理员管理，不能被不可信进程重命名或挂载替换。
+- PC 不注册实际回调，显示 PLATFORM UNAVAILABLE；测试在 `/tmp/carmw-cleanup-XXXXXX` 中创建并清理自己的文件，验证符号链接边界、配置保留、目录保留、异步成功、特殊文件失败，以及 UI 默认取消与失败反馈。没有清理宿主真实日志。
+- 当前主程序没有已接入此目录的文件日志写入器；目录不存在是成功空操作，不能据此宣称已有日志释放空间。部署方需将应用日志限定在专用目录；不清理 `/var/log`、Qt `/opt/car/log` 或升级文件。
+- 本接续 PC clean build、BOARD clean build 均退出 0；首次 CTest 揭示旧导航断言未计入新增入口，修正后 CTest 7/7 通过（22.58 秒）。语言字体/翻译、工厂密码及 12 项页面未在此接续实现，仍是明确待完成项。
+
+**2026-11-12 电动助力转向（EPS）普通入口移植**
+
+- 对应 Qt `qml/Settings/DrivePeopleHelp.qml` 第 4 项「电动助力转向」与 `qml/Settings/ElectricPowerStepping.qml`；层级为 设置 → 行程资讯 → 驾驶员辅助 → 电动助力转向。入口由工厂位 `enableElectricPowerSteering`（Qt 缺省 false）控制，本工程映射 `factory_features` bit6（`feature_on(6)`），与 `feature_names[0]` 一致；工厂页该项不再标注 CONFIG ONLY。
+- 数据层：`car_driver_assist_t` 新增 `uint8_t steering_mode`（index 9，0 常规 / 1 运动），`car_state_init` 缺省 0；`car_decode.c` 0x86 压缩编码新增 `case 9`，`status==1` 映射运动，其余常规。命令复用 `car_cmd_set_vehicle_setting(9, status)`（payload `[0x86,(status<<6)|9,0]`）。
+- 设置页：新增 `UI_SETTINGS_VIEW_EPS`、`UI_SETTINGS_ASSIST_EPS`（驾驶员辅助第 4 项）、`UI_SETTINGS_EPS_MODE/BACK` 两行（右侧文字 SPORT/NORMAL），`eps_list/eps_rows/eps_index`、`eps_page_style()` 与 `handle_eps_key()`；`view_sync`、`list_center_current`、`apply`、`back`、`pop_to_root`、`feature_visibility` 均接入。OK 只下发命令，**不做本地翻转**，显示以 MCU 回读为准（与驾驶辅助一致）。
+- Qt 参考自身不一致：`ElectricPowerStepping.qml` 用 `!SettingsMgr.steeringMode` 下发且 onText=运动，本实现按协议语义「status 1 = 运动」处理，未照抄取反。
+- 附带修复两处既有编译错误：`car_settings_values_t` 补 `unit_temperature` 字段；`car_settings_saver.c` 的 `stop` 字段名对齐头文件 `stop_requested`（4 处）。
+- 回归：`test_decode.c` 新增 index 9 回读（0x49→运动、0x09→常规、缺省 0）；`test_command.c` 新增 9/1、9/0 载荷断言。PC 构建退出 0，CTest **8/8 通过**（35.03 秒）；AArch64 交叉构建（Linaro GCC 7.4.1，Release，`--clean-first`）退出 0，`file` 确认 aarch64 ELF，项目源码 0 告警（剩余 108 条均为第三方 `lv_opengles_shader.c` 原始字符串历史告警）。未部署，未发送真实命令。
+- 驻车辅助、底盘控制已补普通入口，见下方小节；自动启停无普通入口，工厂位 bit10 已接线到底部灯位可见性，见下方自动启停灯位小节。
+
+**2026-11-12 驻车辅助（含倒车侧预警 RCTA）与底盘控制普通入口移植**
+
+- 对应 Qt `qml/Settings/DrivePeopleHelp.qml` 第 2、3 项与 `ParkAssist.qml`、`ChassistControl.qml`；层级为 设置 → 行程资讯 → 驾驶员辅助 → 驻车辅助 / 底盘控制。
+- 行序与命令（Qt 索引 → 本工程 0x16 SetGet index，均只发命令、不做本地翻转）：
+  - 驻车辅助：MOVING OBJECT 4、FRONT RADAR 5、REAR RADAR 6、DISPLAY 7、REAR CROSS TRAFFIC 26（开关取反）、RADAR VOLUME 17（LOW/MID/HIGH 循环）、RADAR DISTANCE 18（NEAR/MID/FAR）、PARKING SENSOR 27（OFF/ON/FRONT ONLY）、BACK。
+  - 底盘控制：ACTIVE TRACE CONTROL 8、ACTIVE ENGINE BRAKE 19（开关取反）、BACK。
+- 数据层：新增 `car_parking_chassis_t`（`car_state_t.parking_chassis`），缺省开关全 true、三档选项 0；`car_decode.c` 0x86 压缩编码新增 `case 4/5/6/7/8/17/18/19/26/27`，与 Qt `advance_parse.cpp` 的 d1~d4 回退位图一致。
+- 设置页：新增 `UI_SETTINGS_VIEW_PARKING/CHASSIS`、`UI_SETTINGS_ASSIST_PARKING/CHASSIS`、两套行枚举，`parking_list/parking_rows/parking_index`、`chassis_list/chassis_rows/chassis_index`，`parking_page_style()`/`chassis_page_style()`、`handle_parking_key()`/`handle_chassis_key()`、`ui_settings_page_set_parking_chassis()`；`view_sync`（列表 24/25）、`list_center_current`、`apply`、`back`、`pop_to_root` 均已接入。`ui_app.c` 每次 apply 注入 `state.parking_chassis`，变化时才刷新相关行。
+- 工厂门控：倒车侧预警行按 `factory_features` bit9（`feature_on(9)`）隐藏并跳过，工厂页该项去掉 CONFIG ONLY 标注（自动启停 bit10 仍保留 CONFIG ONLY 标注，但已接线到灯位可见性）。
+- 未迁移的车型差异：Qt ParkAssist 按车型隐藏 FRONT/REAR RADAR、DISPLAY、RADAR VOLUME、RADAR DISTANCE（XTrail 系列），PARKING SENSOR 仅 Infiniti/X21 显示；本工程尚无车型枚举（`car_state.car_model` 仅名字列表），这些条件行**恒显示**，待车型映射补齐后处理。
+- 回归：`test_decode.c` 新增 index 4/5/6/7/8/17/18/19/26/27 回读与缺省值断言；`test_command.c` 新增同批 index 载荷断言。PC 构建退出 0，CTest **8/8 通过**（38.21 秒）；AArch64 交叉构建（Linaro GCC 7.4.1，Release，在 `/tmp` 非 hgfs 目录）退出 0，`file` 确认 aarch64 ELF。未部署，未发送真实命令。
+- 剩余：自动启停灯位的车型条件（见下方小节）、日期时间滚轮、右舵板端验收。
+
+**2026-11-12 森林人自动启停灯位（码 27/219/28）可见性门控与 300ms/3000ms 闪烁**
+
+- Qt 边界核对：自动启停**没有普通设置页入口**，只有 `qml/PageSettings/PageFactorySettings.qml` 的工厂项 `enableAutoStop`（10 索引位，缺省 false，持久化键 `FactoryBoolSetting/enableAutoStop`）与 `qml/PageModel/PageSubaruForester1.qml:852` 的灯组容器 `visible: SettingsMgr.originalCarId!==SettingsClass.NissanXTrail16 && SettingsMgr.enableAutoStop`。容器内 `Icon217`（id icon217，源 warning_light_217，绑定码 219）与 `IconGeneral`（id icon28，源 warning_light_219）共用 712,630 的 64×64 位置。本工程不新增普通入口。
+- 另外 `updateIconByFault`（Forester1.qml 1072 起）对码 27 有专属特判：`flagsStatus>0` 才亮，状态 2 闪 300ms、状态 3 闪 3000ms，其余熄灭；与整组默认 600ms/6000ms 不同。
+- 实现：`ui_lamp_group.h` 新增门控 `UI_LAMP_GATE_AUTO_STOP`；`ui_lamp_group.c` 在该门控下先看 `state->factory_auto_stop`，关闭时 `lamp_apply_level(...,0)` 并跳过（MCU 故障码保留在 state），开启时按通用路径取灯态，并在 `lamp_apply_level()` **之后**用 `ui_lamp_set_blink_ms()` 覆写为 `LAMP_GROUP_AUTO_STOP_FAST_MS 300` / `LAMP_GROUP_AUTO_STOP_SLOW_MS 3000`。顺序必须如此：切到闪烁态时 `lamp_apply_level → ui_lamp_set_state(UI_LAMP_BLINK) → lamp_blink_start` 会按整组默认值重建定时器。
+- 数据层：`car_state_t` 新增 `bool factory_auto_stop`（缺省 false，`car_state_init` 置 false）；`ui_app.c` 的 `settings_override_units()` 每次 apply 用 `factory_features & (1U<<10)` 注入，与工厂页可见位同一张位图。
+- 页面：`page_subaru_forester1.c` 底部灯排原 27/219 合并项拆为三个完全重叠的灯项——码 27（`WarnIcon/217.png`）、码 219（`WarnIcon/219.png`）、码 28（`WarnIcon/219.png`），均带 `UI_LAMP_GATE_AUTO_STOP`，坐标为 712,630、64×64，靠创建顺序决定覆盖，与 Qt 容器内叠放一致。
+- 未迁移差异：`originalCarId!==NissanXTrail16` 是本工程不具备的车型语义枚举（`car_state.car_model` 只有 id/名字列表），恒按「非 XTrail16」处理，已在头文件注释标注；待车型映射补齐后再补条件。
+- 回归：`tests/test_overlays.c` 新增 `test_lamp_auto_stop_gate`（缺省门控关闭即便 MCU 点亮 27 也熄灭；开启后常亮；快闪 149ms 仍亮、150ms 隐藏；慢闪 1499/1500；故障清零熄灭；门控再关闭熄灭）。PC clean build 退出 0，CTest **8/8 通过**（101.55 秒）；AArch64 BOARD 交叉构建（`/tmp/lvgl_two_board_acceptance`，Release）退出 0，`file` 确认 aarch64 ELF。未部署，未发送真实命令。
+
+**2026-11-12 森林人油量表加油口方向图标（左/右 × 白/黄）**
+
+- Qt 边界核对：森林人实际使用的 `qml/FuelTank/ForesterFuelTank1.qml`（`PageSubaruForester1.qml:548`，1589,295）只含底图、刻度裁剪图、44×44 油枪图标（66,316）与 F/E 标记，**自身不渲染加油口方向图标**。方向图标来自通用仪表（`GeneralUi2.qml:934-960`、`GeneralSpeed4.qml:77-92`、`GeneralFuel1/5/7.qml`、`LamborghiniFuel2.qml`、`Subaru20FuelTank.qml`）：64×64，按 `SettingsMgr.fuelFillerLeft`（或 0x02 帧 `isLeftTank`）选左/右，按 `GlobalData.items.fuelStateIcon===0` 判白图、否则黄图。资源 `ResourceLib.qml:364-369` 的 `left/right_fuel_white/hig.png`。
+- 工厂项：`PageFactorySettings.qml:680` 的 `fuelfiller`（`["<<",">>"]`），持久化键 `FactorySetting/isOilLeft`（0=左，缺省左）；`SettingsManager.cpp:178-179` 的 `m_fuelFillerLeft = (isOilLeft == 0)`。设置页加油口命令此前已迁移，本轮只补图形。
+- 数据层无需改动：`car_fuel_t` 已有 `icon_state`（`car_decode.c:145` 取 `data[3]&0x0F`，2 为低油量）与 `port_left`（`data[3]&0x80`），与 Qt `fuel_parse.cpp:36` 的 `fuelState` 高位/低位一致。图形取帧里的真实位置，而非本地工厂设置，避免 MCU 回读不一致时画错方向。
+- 实现：`fuel_forester1.c` 在 250×368 容器内新增 `port_img`（64×64，位置 56,306，即与 44×44 油枪图标同心：66+(44-64)/2、316-10），叠在油枪图标之上；四张变体用 `ui_assets_load_image()` 一次性读入常驻描述符 `port_dsc[4]`（0 左白 / 1 左黄 / 2 右白 / 3 右黄），运行期只切描述符指针并靠 `port_variant` 去重。不使用 `.bin`：本工程资源根 `UI_ASSET_ROOT "A:/src/"` 对应 STDIO 驱动 `LV_FS_STDIO_PATH "./assets"` 下的 `src/`，其余 `ui_assets_load_image` 调用一律用 `.png`；曾误用 `WarnIcon/*.bin` 导致 `carmw_overlays` 段错误，已改回 `.png`。任一素材缺失时整块图标不创建，不影响原油量表。
+- 页面：`page_subaru_forester1.c` 在 `st->fuel.valid` 分支内 `fuel_forester1_apply()` 之后调用 `fuel_forester1_apply_port(&ui->fuel, st->fuel.port_left, st->fuel.icon_state)`。
+- 未迁移差异：Qt 通用仪表在 `fuelStateIcon` 非 0/非 2（1 近报警、3 报警）时也用黄图，本工程按 `icon_state==2` 判黄，与 Qt 的 `===0 ? 白 : 黄` 等价（只有 0 是白）。红图（`*_fuel_low.png`）Qt 该处未使用，本工程同样不接。
+- 回归：`tests/test_overlays.c` 新增 `test_fuel_port`（缺省左白；左+黄；右白；右黄；重复同状态不换源）。PC 构建退出 0，CTest **8/8 通过**（32.45 秒）；AArch64 BOARD 交叉构建（`/tmp/lvgl_two_board_acceptance`，Release）退出 0，`file` 确认 aarch64 ELF。未部署，未发送真实命令。
+
+**验证现场与结论边界**
+
+- 本批首轮 PC clean build 暴露右舵测试缺少 `UI_IMG` 定义头文件的链接失败，已加入 `ui_common.h` 修复；最终对修复后的代码执行 `cmake --build build --clean-first -j8` 及 `ctest --test-dir build --output-on-failure`，退出 0，CTest 6/6 通过、0 失败，总测试耗时 33.32 秒。
+- 当前回归：协议 1688、配置 246、覆盖层 1193、转向灯 5369、指针 173、按键 755 项检查，全部零失败；日期/互联回归及模式标签即时刷新包含在按键测试中。覆盖层原系统菜单导航失败已消除。
+- AArch64 工具链已核实为 Linaro GCC 7.4.1，`cmake --build build_board --clean-first -j8` 退出 0，未部署。
+- 镜像生命周期覆盖像素释放、回切文件源及带镜像销毁重建；未使用内存检测器（环境未安装 Valgrind），不将对象数量稳定等同于堆内存泄漏检查。
+- 板端真实命令、视觉及性能验收仍待完成；本批无部署、烧写或重启。
+
+**下次接续顺序**
+
+1. 读取本节及 14.7 最新记录，检查 `include/carmw/car_settings.h`、`src/car_settings.c`、`src/ui/settings/ui_settings_page.c/.h`、`src/ui/ui_app.c` 和三个设置/按键/覆盖层测试的工作区差异，确认已有字段、入口和未完成分支。Qt 参考 `/home/xfy/CarHml_XIAO` 保持只读。
+2. 先执行 `cmake --build build --clean-first -j8`，成功后执行 `ctest --test-dir build --output-on-failure`，处理真实失败并记录结果；必要时验证 BOARD 构建。hgfs 下不得仅凭增量构建认定最新代码已编译。
+3. 对本次语言/工厂/清缓存做板端视觉与平台验收（EPS、倒车侧预警、驻车辅助/底盘控制、自动启停灯位门控、加油口方向图标已于 2026-11-12 完成，见上方小节；自动启停车型条件待车型映射补齐）；日期时间滚轮、入场动画与 Linux 系统时间/RTC 同步已完成，待板端视觉与 root 权限实测；右舵仍需板端视觉/性能验收。车色遵守 Qt Forester 无入口边界，不新增入口。每完成一项立即回填对应小节、此进度表和下一步。
+4. 真实 SDK、动画播放器、板端视觉/性能分别列清依赖与验收状态；不执行实际升级、烧写或重启，不把配置保存当成设备功能已生效。
+
+
+| 板端性能专项 | 状态 |
+|---|---|
+| E3 第一阶段 PNG 配置（2026-11-09） | 16MiB 图片缓存、64 项头缓存、8KiB STDIO 缓存、360 行缓冲及条件 NEON 已配置；BOARD Release 交叉构建通过、NEON 已编译链接，未板端实测，E3 未完成，见 12.2 E3 最新补充 |
+
 ### 阶段 0：基础框架（已完成）
 
 1. `ui_node.h` / `ui_style.h` / `ui_style_registry.c` / `ui_app.c/.h` / `PageModel/page_model.h`
@@ -132,7 +267,7 @@ src/ui/
 |---|---|
 | `SpeedDial/speed_forester1` | 已接入；公英制接线、指针、单位标签及高亮缓存未闭环，见 B1 |
 | `RotationDial/rotate_forester1` | ✅ 完成（角度递减、8 刻度高亮、`0` 恒为大字号） |
-| `widgets/ui_tick` + `FuelTank/fuel_forester1` | ✅ 完成（≤25% 换红刻度图，见 B2） |
+| `widgets/ui_tick` + `FuelTank/fuel_forester1` | ✅ 完成（≤25% 换红刻度图，见 B2；2026-11-12 补加油口方向图标 64×64 叠加） |
 | `WaterTemp/water_forester1` | ✅ 完成（HIGH/OVERHEAT 切高温图标并移位） |
 | `ComControl/ui_gear` / `ui_mileage` / `ui_range` | ✅ 完成并已接入页面 |
 | `ComControl/ui_clock` | ✅ 完成并已接入（`car_clock_t`，`hour24` 决定 12/24 小时制，冒号 1s 闪烁） |
@@ -202,8 +337,9 @@ src/ui/
 - 右表盘未接入的三项（原因已写在页面文件注释里）：
   `baoyang`（码 290 超出 `uint8_t`）、`coolant`（码 232 与智能模式冲突，Qt 后定义者生效）、
   `eco`（设置项 `ecoEnable/ecoIndicator` 驱动，不属于故障码，留到阶段 6）。
-- 底部灯排 `s_bottom_lamp_items`（灯群 9 项，绝对坐标）：发动机 2、自动启停警告 27/219（`217.bin`）、
-  自动启停未检测 28（`219.bin`，与上一盏完全重叠，靠创建顺序决定覆盖）、
+- 底部灯排 `s_bottom_lamp_items`（灯群 10 项，绝对坐标）：发动机 2、自动启停警告 27（`217.bin`）、
+  自动启停相关 219、智能怠速不可用 28（同在 (712,630) 64×64，三者完全重叠，靠创建顺序决定覆盖；
+  均受 `UI_LAMP_GATE_AUTO_STOP` 门控，码 27 快闪 300ms/慢闪 3000ms，见上节）、
   智能怠速工作 26、紧急制动 (828,630)、盲区 (886,630)、车道偏离 (944,630)、
   XMode (1002,630) 64×64、陡坡缓降 (1066,633) 30/94。
 - 设置驱动的五项（14.8 已全部接线）：紧急制动/盲区/车道偏离由 `driver_assist` 开关 + `high_func.lane`
@@ -534,7 +670,7 @@ PC 假帧每 0.5s 轮换故障码，整轮约 32s；0x11 瞬时油耗每约 3s �
 
 ### 阶段 6（后置）
 
-设置体系（明暗、单位、卡片可见性）、CarPlay、升级流程。
+设置体系（明暗、单位、卡片可见性）、CarPlay。
 
 详细迁移步骤、依赖、验收及待确认项见本文第 14 节。该节是实施计划，不代表已实现或已批准执行；此前 E2/E3 未闭环项继续保留。
 
@@ -651,7 +787,7 @@ ctest --test-dir build --output-on-failure
 
 - PC 与板端 `lv_conf` 字号已对齐：14/20/24/28/36/44/46/48（PC 端此前漏开 14，已在 `config/lv_conf.h` 补 `LV_FONT_MONTSERRAT_14`）
 - LVGL 内置 Montserrat 没有粗体字重，Qt 的 `font.bold: true` 只能近似为同字号常规体
-- 中文字库尚未转换，所有中文文案暂用英文占位（如 `"RANGE: "` 应为 `"续航里程:"`）
+- 中文字库：设置页使用 24px 子集 `ui_settings_cjk.c`；仪表本体使用 `ui_i18n_cjk_14/18/20/22/24/28/36.c`（2026-11-13 新增，由 `tools/settings_font.py` 从 `ui_i18n.c` 词库收集字符生成），44/46/48 映射到 36。子集只保证词库内汉字，缺字时回退英文原字体；外部中文字符串仍未支持。
 - Qt 参考字号：档位 46（forester 材质实际 62）、里程 24~28、转速刻度 44/48
 
 ### 7.4 性能与线程约束
@@ -979,8 +1115,7 @@ file /tmp/lvgl_two_board_acceptance/bin/carmw_ui_demo
 1. **设置体系**：先列设置项、默认值、持久化和协议/本地设置优先级，再做单位、明暗、卡片可见性；测试重启恢复及状态不变时设置即时生效。
 2. **提示/覆盖层开关**：雷达、盲区、紧急制动、右舵和设置页遮挡，分别对照Qt；所有卡片隐藏时须有确认的退路。
 3. **真实媒体/连接**：现有演示卡片不等于CarPlay/ZLink可用。先拿到实际SDK/API、硬件和授权，再对接状态；没有条件只报告界面演示完成。
-4. **升级流程**：先确认平台接口、升级包校验、失败恢复与用户交互，不凭Qt界面臆造可用升级后端；本方案不安排自动执行真实升级。
-5. 每项独立验收，不将阶段6缺失混入Style1基础逻辑修复，也不未经确认扩大工作范围。
+4. 每项独立验收，不将阶段6缺失混入Style1基础逻辑修复，也不未经确认扩大工作范围。
 
 ---
 
@@ -1727,6 +1862,20 @@ Qt依据（文件链接、函数/分支）：
 
 #### E3 性能问题记录（2026-11-05，进行中）
 
+补充：第一阶段 PNG 板端性能配置（2026-11-09，以本补充为最新状态）
+
+- 已按批准范围修改 `config/lv_conf_board.h`：图片缓存 16MiB、图片头缓存 64 项、STDIO 缓存 8192 字节、PARTIAL 单缓冲 360 行；仅在 `__aarch64__` 或 `__ARM_NEON` 已定义时启用 NEON，否则使用 NONE，避免 arm32 无 NEON 编译选项时强制启用。
+- PNG 路径、资源、LODEPNG、刷新周期及抗锯齿保持不变，先用于同资源对照。缓存与较大绘制缓冲会增加内存占用，实际峰值待测。
+- 更正此前建议：`third_party/lvgl/src/libs/bin_decoder/lv_bin_decoder.c` 的 `lv_bin_decoder_info()`（126–127 行）及 `lv_bin_decoder_open()`（195–196 行）均按小写 `bin` 扩展名筛选。不能将 bin 内容改名 `.png` 后沿用 PNG 路径；本次未生成此类部署资源，也未执行删除操作。
+- 验证结果：复用 `build_board`，执行 `cmake -S . -B build_board -DCMAKE_BUILD_TYPE=Release` 和 `cmake --build build_board -j8` 成功；随后补传 `-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DCARMW_BUILD_TESTS=OFF` 配置及构建，退出码 0。编译/链接使用 `/home/xfy/gcc-linaro-7.4.1-2019.02-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc`，LVGL flags 与程序链接均为 `-O3 -DNDEBUG`。
+- 构建目录限制：该历史目录 `CMakeSystem.cmake` 仍为 `x86_64` / `CMAKE_CROSSCOMPILING=FALSE`，追加系统参数未刷新此生成文件；不能凭该元数据宣称已正确配置 CMake 交叉模式。实际交叉编译由编译器、链接命令及 ELF 架构确认，BOARD 测试关闭，未在 host 执行目标程序。后续需规范 CMake 交叉模式时使用独立新目录及完整目标系统参数。
+- 产物：`build_board/bin/carmw_ui_demo`，`file` 确认 ELF 64-bit ARM aarch64、解释器 `/lib/ld-linux-aarch64.so.1`；SHA256 `64f8c9956b4c0d4a4b30d26d585fce784eb55fae1b6a3937551daf4f493e4080`。
+- NEON 证据：交叉编译器预处理定义 `__aarch64__=1`、`__ARM_NEON=1`、`LV_USE_DRAW_SW_ASM=LV_DRAW_SW_ASM_NEON`，缓存及缓冲宏均为本次设定值；RGB565 NEON 对象反汇编含 `umull v29.4s, v18.4h, v23.4h` / `umull2` 等向量指令，最终 ELF 中 `nm` 找到 40 个 `T lv_draw_sw_blend_neon_*` 函数。无架构宏时 NONE、仅 ARM_NEON 时 NEON、仅 aarch64 时 NEON 的预处理分支均通过；未做真实 arm32 工具链编译验证。
+- 现有检查：`cmake --build build-png-pc -j8` 成功，`ctest --test-dir build-png-pc --output-on-failure` 6/6 通过（23.10s），`git diff --check` 通过，资源及路径代码无差异。BOARD/PC 重编译出现第三方 `lv_opengles_shader.c` 的 `missing terminating " character` 警告，未作为零警告构建报告。
+- 未部署、未板端实测，实际 FPS、内存峰值与改善幅度未知，E3 保持未完成。
+- 下一步：仅替换程序、保留同一套 PNG 资源，在单实例板端对照冷启动/缓存预热后切卡、切门、指针运动的 FPS、绘制/刷屏耗时及内存峰值；不得把构建成功当作性能改善证据。
+
+
 ```text
 任务ID：E3（板端帧率/交互流畅度）
 状态：已定位指针卡顿的主因并完成第一轮优化；待板端复测帧率
@@ -1903,8 +2052,10 @@ Qt依据（文件链接、函数/分支）：
   转向灯共享相位修复及PC回归已完成，板端同步效果待复测。
   本轮已完成100ms原生线性指针插值、板端20ms刷新配置及PC 4/4回归，
   BOARD Release构建通过，未部署；50fps仅为调度目标，不保证实际帧率，
-  车门绘制瓶颈未解决。下一步经用户确认后单实例实机复测指针连续性、
-  转向灯同步与切门绘制/刷屏耗时、实际FPS。两项保持未勾选，见12.2 E2/E3记录）
+  车门绘制瓶颈未解决。2026-11-09 已完成第一阶段 PNG 缓存、360 行缓冲及
+  条件 NEON 配置；下一步保留同一套 PNG 资源，单实例实机对照冷启动与缓存
+  预热后的切卡、切门、指针运动、绘制/刷屏耗时、实际 FPS 和内存峰值。
+  未板端实测，两项保持未勾选，见12.2 E2/E3最新补充）
 - [ ] 所有已知偏差、后置项、测试限制已回填；没有把模拟数据当实车结果。
 
 上述复选框均为待执行项，写入方案不表示已验证。
@@ -1929,7 +2080,7 @@ Qt依据（文件链接、函数/分支）：
 - 第三批：C1 → C2 → C3；重点验证上一轮三项修复在整页生命周期中仍成立。
 - 第四批：D1 → D2 → 经确认后的D3；没有Qt可运行参考时先完成布局清单，不声称像素验收通过。
 - 第五批：E1 → E2 → E3；无板卡时只完成E1，其余保留阻塞。
-- 第六批：用户确认范围后执行F，按设置、覆盖开关、真实连接、升级分别交付。
+- 第六批：用户确认范围后执行F，按设置、覆盖开关、真实连接分别交付。
 
 并行规则：允许不同AI只读核对Qt组件；允许互不重叠的组件任务并行。数据结构、解码器、样式主页面、CMake、同一交接文档由单一执行者整合，禁止多个AI同时覆盖。每个任务都需回报输入契约和测试证据，整合者重新跑全量回归。
 
@@ -1941,7 +2092,7 @@ Qt依据（文件链接、函数/分支）：
 
 **状态：仅编写计划，未开始阶段6功能实现。** 用户已反馈板端0x20按键能够切换；这只作为按键翻卡的实机确认，不推定13/23/26完整路由、31全部车型风格、CarPlay或设置已通过。
 
-目标：迁移Qt的设置模型、设置交互、状态相关按键、设置驱动的显示规则、真实互联适配与升级交互/后端。每个子项分别记录“代码完成 / PC验证 / 板端验证 / 阻塞依赖”，不能合并宣称全部完成。
+目标：迁移Qt的设置模型、设置交互、状态相关按键、设置驱动的显示规则与真实互联适配。每个子项分别记录“代码完成 / PC验证 / 板端验证 / 阻塞依赖”，不能合并宣称全部完成。
 
 本轮核对后的纠正：
 
@@ -1949,9 +2100,8 @@ Qt依据（文件链接、函数/分支）：
 2. **23不是始终无动作。** Qt存在音乐卡发命令、互联卡进入投屏、低速打开设置、设置项确认等分支。此前LVGL忽略23只是功能未迁移，不是完整Qt行为。
 3. **31不是全局样式注册表简单轮询。** 必须按车型可用风格映射并保存；当前注册的forester1/general1不等于同一车型的两个合法风格。
 4. **CarPlay不是占位页面。** Qt使用ZLink回调、H.264硬解和硬件视频图层；UI原型或模拟状态不能记作真实互联完成。
-5. **升级不是新增一个设置按钮即可完成。** Qt现有入口为USB设备检测；设置菜单未发现对应升级项。是否保留自动检测、是否增加确认须单独确认。
-6. 现阶段目标板为T507/aarch64；T113为后续单独平台适配，不默认工具链、SDK二进制、硬解/显示接口可以直接复用。
-7. E3车门绘制性能、实际50fps目标和未完成视觉项继续独立跟踪。阶段6实现前先完成E2/E3闭环，或经用户确认带着明确未完成项推进；不能因新功能开始而勾选旧验收。
+5. 现阶段目标板为T507/aarch64；T113为后续单独平台适配，不默认工具链、SDK二进制、硬解/显示接口可以直接复用。
+6. E3车门绘制性能、实际50fps目标和未完成视觉项继续独立跟踪。阶段6实现前先完成E2/E3闭环，或经用户确认带着明确未完成项推进；不能因新功能开始而勾选旧验收。
 
 ### 14.2 Qt依据与现有LVGL落点
 
@@ -1963,7 +2113,6 @@ Qt依据（文件链接、函数/分支）：
 | 状态相关路由 | [main.qml](file:///home/xfy/CarHml_XIAO/qml/main.qml#L753-L1191) | [ui_app.c](file:///mnt/hgfs/share/lvgl9.5demo/lvgl_two/src/ui/ui_app.c)、[ui_session.h](file:///mnt/hgfs/share/lvgl9.5demo/lvgl_two/src/ui/ui_session.h)，目前只具备仪表舞台与部分跨样式会话 |
 | 设置菜单 | [PageMainSettings.qml](file:///home/xfy/CarHml_XIAO/qml/Settings/PageMainSettings.qml#L24-L105) | 尚未迁移根菜单/子页/焦点与编辑状态 |
 | 互联SDK与硬解 | [main.cpp](file:///home/xfy/CarHml_XIAO/main.cpp#L121-L140)、[zlinkmanager.h](file:///home/xfy/CarHml_XIAO/src/CarPlay/zlinkmanager.h)、[h264decoder.cpp](file:///home/xfy/CarHml_XIAO/src/CarPlay/h264decoder.cpp) | 当前互联卡和演示注入不等于设备后端 |
-| 升级 | [upgrademanager.cpp](file:///home/xfy/CarHml_XIAO/src/upgrademanager.cpp)、[UpgradePopup.qml](file:///home/xfy/CarHml_XIAO/qml/ComControl/UpgradePopup.qml) | 尚无完整升级服务/串口交接/恢复流程 |
 
 ### 14.3 实施顺序与交付批次
 
@@ -1976,10 +2125,9 @@ Qt依据（文件链接、函数/分支）：
 | 6.4 | 单位/明暗/卡片/覆盖层即时生效 | 6.1～6.3 |
 | 6.5 | 车型风格、车辆设置命令与反馈 | 6.2～6.4，MCU协议已核对 |
 | 6.6 | ZLink、硬解、视频图层与真实互联 | 6.2、6.4，SDK及硬件条件齐备 |
-| 6.7 | USB升级状态机、界面与平台后端 | 6.2，升级/恢复契约确认 |
-| 6.8 | 全链路、视觉、生命周期、板端验收 | 所有已纳入范围的前置项 |
+| 6.7 | 全链路、视觉、生命周期、板端验收 | 所有已纳入范围的前置项 |
 
-推荐按6.0→6.1→6.2先交付最小闭环，再逐批推进。6.6和6.7可分别调查外部依赖，但不得并行覆盖公共UI状态、串口所有权或同一构建文件。任何缺少SDK/平台接口的子项保留阻塞，不用模拟后端替代真实验收。
+推荐按6.0→6.1→6.2先交付最小闭环，再逐批推进。6.6可调查外部依赖，但不得并行覆盖公共UI状态、串口所有权或同一构建文件。任何缺少SDK/平台接口的子项保留阻塞，不用模拟后端替代真实验收。
 
 ### 14.4 步骤6.0：冻结迁移契约与当前基线
 
@@ -1987,12 +2135,12 @@ Qt依据（文件链接、函数/分支）：
 
 1. 先确定本轮车型范围：建议先闭环当前Forester Style1；Qt其他车型、赛道专用分支先登记，不擅自扩到全部车型。
 2. 建立设置逐项清单：属性名、INI节/键、类型、缺省值、合法范围、是否持久化、车型可见条件、MCU读写、影响的控件、Qt依据与验收用例。
-3. 建立按键矩阵：原始键/短长按 × 仪表卡片/设置根页/设置子页/互联/升级；另记车型特例和同一信号被多个QML组件监听的情况。
+3. 建立按键矩阵：原始键/短长按 × 仪表卡片/设置根页/设置子页/互联；另记车型特例和同一信号被多个QML组件监听的情况。
 4. 记录现有PC回归、板端程序/资源校验值、单实例启动、串口、分辨率和当前FPS/绘制/刷屏耗时。旧300ms样本保留为历史，不代替本次测量。
 5. 固定同一输入序列下Qt的选中项、卡片、风格及返回行为。对象创建顺序不能作为业务卡片顺序的依据。
 6. 记录中文字体和菜单文案要求；此前仪表英文豁免不自动延伸到新增中文设置页。
 
-**验收**：清单中每项能追到Qt实现；未知默认值/硬件依赖标“待确认”；无未经确认的新首页、全车型或升级入口扩展。
+**验收**：清单中每项能追到Qt实现；未知默认值/硬件依赖标“待确认”；无未经确认的新首页、全车型或入口扩展。
 
 ### 14.5 步骤6.1：设置模型与持久化
 
@@ -2145,6 +2293,8 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 
 ### 14.7 步骤6.3：设置菜单与本地交互
 
+2026-11-12 接续结果：日期合法性（含闰日/非法日期）、取消草稿、回读不覆盖编辑稿、时间源和 12/24h 命令，以及互联开关/模式持久化、设备名称降级与模式标签即时刷新已纳入回归，按键测试 755 项零失败、配置测试 246 项零失败。PC CTest 6/6 通过，BOARD clean build 通过。日期仍未同步 Linux 时间，互联仍无 SDK；车色因 Qt Forester 无入口未擅自开放；右舵局部显示完成边界见 14.8。语言、工厂设置、清缓存仍待实施。以下 11-11 记录保留为历史，不代表当前测试状态。
+
 按根分类迁移，不一次铺开所有车型菜单：
 
 1. **根页和通用列表**：迁移布局、分类顺序、选中态、边界循环规则、开关/选项/数值编辑方式及返回行为。
@@ -2152,6 +2302,10 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 3. **信息选项**：行车信息中的车速、挡位、油耗、外温等开关；与中央卡片显隐分别绑定。
 4. **行程资讯**：按当前车型迁移已有项目；驾驶辅助、车辆设置进入6.5命令/反馈闭环；赛道项目不自动纳入Forester。
 5. **系统设置**：语言、日期时间、版本、工厂设置、清缓存、开机动画、返回。逐项确认权限与平台接口；不得用清缓存按钮顺带删除配置或业务数据。
+   - 2026-11-11：新增开机动画配置入口，复用多选页，默认 0、选项 0/1；OK 提交并返回，BACK/13 取消未确认选择，26 短按在动画选项内前进循环。`animation_style` 纳入现有 ACC 关闭原子保存链。按 Qt `PageListSelect.qml` / `SettingsManager.cpp` 的配置契约实现；当前没有开机动画播放器，页面明确显示 CONFIG ONLY / PLAYER UNAVAILABLE，不能记作播放完成。
+   - 验证：PC 与 AArch64 BOARD 全量 clean build 成功；配置测试 222 项通过，动画取消/确认及 26 循环测试随 steering_key 通过。全量 CTest 首轮 5/6 通过，覆盖层测试仍按旧系统菜单顺序跳过动画项，已补充动画焦点断言，正在 clean rebuild 后复验。
+   - 进度：动画配置完成，播放器仍未接入；语言、工厂设置和清缓存仍未完成。2026-11-11 新增日期时间页：时间源 `0x05 / SetGet / [6, source]`（1 中控、2 仪表）等待 MCU 回读；仪表模式可编辑年月日时分，发送前校验月天数；24/12h 命令保留其他单位回读字段。当前只下发 MCU，尚未同步 Linux 系统时间，日期编辑交互为列表逐项加一，未复刻 Qt 滚轮。日期页面 PC/BOARD 构建及回归待本轮最终验证。
+   - 互联配置新增开关和 Android Auto / Apple CarPlay / HiCar 模式，纳入现有 ACC 保存配置；页面明确 `SDK UNAVAILABLE` / `CONFIG ONLY`，不会启动模拟连接。设备名称进入页面时按 Qt 读取 `/usr/goc/bt_conf.ini` 的 `localname`，缺失或空值显示 `CAR-KIT`；真实 SDK 仍阻塞。车色已从持久配置注入 UI 快照，复用 Forester 中央车模 car_mask 染色，只作用车身蒙版；右舵显示接线仍待完成。系统菜单初始向下焦点及返回循环已统一为日期项，覆盖层测试补齐 DATE→VERSION→ANIMATION→BACK→DATE 导航。
 6. **互联设置**：名称、开关、连接模式选项，后端依赖6.6；后端不可用时如实显示不可用，模拟画面明确区分。
 7. 中文字体先提取所需字符、验证字号与资源占用；视觉对齐使用Qt截图，不能把无窗口对象测试当成字体/布局验收。
 
@@ -2174,6 +2328,10 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 
 **本轮已完成**
 
+- **2026-11-12 右舵显示**：只读对照 `PageSmallDoor.qml`、`PageCarDoor.qml`、`NavigationForester.qml`。Forester1 的小车门三层按故障码 22 镜像；大车门七层镜像并交换四门输入，机盖/尾门不交换，右舵根位置 x=590（Qt 590 宽镜像后平移 100）；中央车模只镜像 660×340 裁剪区域，转向灯交换左右输入。文字和仪表不镜像。设置刷新重放缓存车况，无需新 MCU 帧。
+  - 镜像缓存归图像对象所有；切回左舵释放像素，删除对象时清理 LVGL 图像缓存、像素及源路径；重复 apply 不重复分配。修复大车门镜像失败仍记录成功的问题，失败允许后续重试。
+  - 测试覆盖六个门位、遮挡、左右舵往返、真实素材逐像素水平反射（含 alpha/预乘标志）、缓存复用和释放、带存活镜像的销毁重建、设置即时刷新、转向四种组合及闪烁相位、跨样式恢复。
+  - 成本：ARGB8888 下三层小门 49,152 字节、七层大门 11,088,000 字节、十二层车模 10,771,200 字节，合计镜像像素约 20.89 MiB，另有解码临时内存及缓存；板端峰值与切换耗时未实测。无窗口回归不代表视觉或性能验收。
 - 单位（里程/温度）与中心卡片勾选即时生效（`car_settings_set_*` → notify → `ui_app_settings_refresh` → `ui_app_apply`），默认 `center_card_mask=0x3FD`，`0` 表示全部关闭。
 - 设置页新增 **信息选项 → 行车信息**（Qt `PageSettingDrivingInfo`）：只迁移在 Forister1 页面真正生效的 3 项——车外温度 `out_temperature`（缺省关）、档位 `gear_on`（缺省开）、平均油耗 `avg_fuel_on`（缺省关）。均已落盘（`setting.cfg` 三个新键）并驱动仪表：档位显隐在 `page_subaru_forester1.c`，外温行同处，平均油耗行在 `page_short_term.c`。
 - 按键：根页“信息选项”先 OK 锁定列表，再 OK 进入行车信息子页；开关行 OK 取反，BACK 回上一级；13 在子页回信息选项，在根页关闭设置。
@@ -2220,7 +2378,7 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 3. 核对背光、超速提醒、驾驶辅助、系统时间等每个命令的编码、参数、反馈和失败语义；复用中间件发送能力，避免UI直接写串口。
 4. MCU控制项采用“请求/等待反馈/实际值”区分；仅本地设置可即时落地。需要回执却缺少回执的操作不得立即显示车辆已执行。
 5. 工厂开关只影响菜单可见性；车型专有命令必须在对应车型启用，未知车型不误发。
-6. 仪表、互联及后续升级共用串口的所有权规则提前明确，避免多个模块并发打开或相互抢读。
+6. 仪表与互联共用串口的所有权规则提前明确，避免多个模块并发打开或相互抢读。
 
 **验收**：PC通过内存端口核对发送字节和响应状态；实机测试需用户确认并在静止台架执行；无响应/断链保持真实状态，切风格无残留对象和重复计时。
 
@@ -2259,16 +2417,74 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
   显示不做本地翻转，等 `0x86` 回读刷新。
 - `ui_app_apply()` 注入 `car_state.vehicle_setting` 四项（迎宾灯 / 室内自动点灯 / 喇叭响应 / 自动解锁）。
 - 未迁移（Qt 工厂配置缺省 false，菜单不显示）：点灯灵敏度、灯光关闭延时、外部车门、单车门解锁、
-  智能钥匙上锁、选择解锁、车门自动上锁、远程启动、转向灯、雨刷器、保养设置。
+  智能钥匙上锁、选择解锁、车门自动上锁、远程启动。
 - 验证：`cmake --build build -j8` 通过；`ctest` 6/6 通过（`carmw_steering_key` 新增
   `test_settings_vehicle_light`，覆盖三级导航、迎宾灯/喇叭/自动解锁命令字节与“显示等回读”）；
   `test_command` 覆盖新构造器字节与 index/control 越界；`test_decode` 覆盖 0x86 车辆设置与扩展 ack；
   `cmake --build build_board -j8` 通过。
 
-- **下一步**：14.9 剩余“车辆设置 / 灯光 / 门锁等命令闭环”中，受 Qt 工厂配置门控的项目
-  （点灯灵敏度、灯光关闭延时、外部车门、单车门解锁、智能钥匙、选择解锁、车门自动上锁、远程启动）
-  桌面端默认不显示，需确认真实车型配置后再接线；转向灯/雨刷器/保养设置仍待迁移；
+**实现状态（2026-11-10，转向灯 / 雨刷器 / 保养设置迁移）**
+
+- 数据模型：`car_vehicle_setting_t` 新增 index 12 `lane_change_flash`、index 20 `rain_sensing_wipers`、
+  index 21 `rear_wiper_reverse_linkage`、index 22 `wiper_mist_mode`、index 29 `rain_sensor`；
+  缺省值与 Qt 一致（前四项 true、雨量传感器 false）。`car_maintenance_t` 新增
+  `set_km_by_item[3]` / `remain_km_by_item[3]` / `item_valid[3]`，用于三项目独立缓存。
+- 回读：`car_decode_high_func()` 的 `0x86` 分支补 index 12/20/21/22/29；
+  `car_decode_maintenance()` 在 len==8 时按 `item` 写入对应项目的设置公里数 / 剩余公里数。
+- 命令：转向灯 index 12、雨刷器 index 20/21/22 复用 `car_cmd_set_vehicle_setting()`（0x16 SetGet）；
+  保养复用既有 `car_cmd_set_service_km()`（0x36 SetGet）：确认下发 4 字节 `{item, km24}`，
+  剩余公里数与重置下发 2 字节 `{item, 0/1}`，与 Qt `sendServiceKM` 一致。
+- 设置页：`s_veh_enabled` 全开，新增 `VIEW_TURN` / `VIEW_WIPER` / `VIEW_SERVICE` /
+  `VIEW_SERVICE_ITEM` / `VIEW_SERVICE_EDIT` 五级页面与对应 `turn/wiper/service` 状态。
+  保养按 Qt `Service` + `PageOilChangeSetting` 两层组织：主列表选机油/轮胎/自定义 →
+  子页“设置保养公里数 / 剩余公里数 / 重置 / 返回” → 6 位数字编辑（选中位黄色）+ 确认/返回。
+  公里数确认时本地更新缓存并下发，显示仍以 MCU 0x36 回读为准。
+- `ui_app_apply()` 扩展注入车辆设置 4 个新字段与 `car_state.maintenance`。
+- 未迁移（受 Qt 工厂配置门控）：点灯灵敏度、灯光关闭延时、外部车门、单车门解锁、
+  智能钥匙、选择解锁、车门自动上锁、远程启动；雨量传感器（index 29）已解码但不显示，与 Qt Forester 一致。
+- 验证：`cmake --build build --clean-first -j8` 通过；`ctest` 6/6 通过
+  （新增 `test_settings_vehicle_turn_wiper`、`test_settings_vehicle_service`，覆盖 index 12/20/21/22
+  命令字节与 0x36 三态下发）；`cmake --build build_board -j8` 通过。
+
+**实现状态（2026-11-10，工厂门控项迁移）**
+
+- 数据模型：`car_vehicle_setting_t` 新增 index 23 `remote_engine_start`（缺省 false，与 Qt 一致）；
+  点灯灵敏度 `headlight_sensitivity`（0~3）、灯光关闭延时 `headlight_off_delay`（0~7）、
+  外部车门 13 / 单车门解锁 14 / 智能钥匙 24 / 选择解锁 25 / 车门自动上锁 28 复用既有字段。
+- 回读：`car_decode_high_func()` 的 `0x86` 分支补 index 23；扩展 ack `{0x86, 0, (status<<4)|control}`
+  保持 control 1 = 灯光关闭延时、control 2 = 点灯灵敏度。
+- 设置页：新增通用多选页 `VIEW_SELECT` 与 `select_kind`，覆盖
+  点灯灵敏度 4 项（SLOW/STANDARD/FAST/VERY FAST）、灯光关闭延时 8 项（OFF/30s/45s/60s/90s/120s/150s/180s）、
+  车门自动上锁 3 项（SPEED/P SHIFT/OFF）；进入时焦点停在当前回读值，确认后立即返回父页（对齐 Qt `PageListSelect`）。
+  灯光页新增“点灯灵敏度 / 灯光关闭延时”两行，车门页新增“外部车门 / 单车门解锁 / 智能钥匙 / 选择解锁 / 车门自动上锁”五行，
+  车辆设置列表新增“远程启动发动机”开关行（index 23）。
+- 命令：多选项走 `car_cmd_set_vehicle_setting_ext()`（control 1/2），自动上锁走
+  `car_cmd_set_vehicle_setting()`（index 28），车门开关项走 index 13/14/24/25，远程启动 index 23；
+  显示一律等 `0x86` 回读，不做本地翻转。
+- 未迁移：雨量传感器（index 29）仅解码不显示，与 Qt Forester 一致；
   真实 ZLink 会话仍待 6.6。
+- 验证：`cmake --build build --clean-first -j8` 通过；`ctest` 6/6 通过
+  （新增 `test_settings_vehicle_gated`，覆盖扩展 control 1/2 字节、index 13/14/16/23/24/25/28 命令字节
+  与多选页导航；`carmw_steering_key` 662 checks / 0 failures）；`cmake --build build_board -j8` 通过。
+
+- **下一步**：14.9“车型风格与车辆设置命令闭环”已覆盖 Qt 工厂门控项，桌面端可全量显示与下发；
+  板端需按真实车型配置确认菜单可见性门控，并对 0x86 回读做实机核对；真实 ZLink 会话仍待 6.6。
+
+**本轮已完成（2026-11-12：日期时间滚轮页 + 中文布局对照）**
+
+- **日期时间页按 Qt `PageDateSettings.qml` 重做**（`src/ui/settings/ui_settings_page.c`）：
+  - `timeSource==2`（仪表，对应 Qt `instrumentMode`）显示 466×110 滚轮底 + 5 列 Tumbler（年 31 项 / 月 12 / 日 31 / 时 24 / 分 60）+ `CONFIRM` + 时间制式 + 时间源 + 返回；其它时间源显示提示行 `OPERATE ON AUDIO UNIT` + 时间源 + 返回，行数与 Qt `rowCount` 一致（4 / 2）。
+  - 状态对齐 Qt：`date_item`=`itemIndex`、`date_focus`=`childIndex`（0~4 列、5 确认、0xFF 未进入）、`date_child_back`=`childNextOrBack`。OK 在滚轮项内推进列（4→5 后标记反向），确认列 OK 下发 0x32 并退出光标；UP/RIGHT 与 DOWN/LEFT 在滚轮内滚动当前列数值（年列到 0/30 停住，月/日/时/分取模），列外循环切换行；时间制式行下发 `car_cmd_set_units`；时间源行下发 0x05 `{6, source==1?2:1}`；返回行回系统设置并停在“日期时间”。
+  - 草稿统一为 0 基索引（年索引、月 0~11、日 0~30、时、分）：修正 `date_day_clamp()` 误把月索引当真实月份、`date_page_enter()` 未转索引、`date_save()` 未 +1 三处偏差；确认时按真实年月日校验（非闰年 2/29 不下发）。0x32 的 hour 字节 bit7 由 `car_cmd_set_time` 固定置位表示 24 小时制。
+  - 系统设置列表“日期时间”行摘要按 Qt ItemDetails 显示 `YYYY.M.D HH:MM` / `HH:MM` / `--.--`。
+- **中文翻译与布局**（`src/ui/settings/ui_settings_language.c`）：修复 `cjk_covers()` 把 UTF-8 原始字节当码点的错误（此前所有中文都判缺字并回退英文）；补词条 `TIME SETTINGS`→`时间设置`、`TIME SOURCE: CENTRAL/INSTRUMENT/UNKNOWN`、`TIME FORMAT: 24h/12h/---`、`OPERATE ON AUDIO UNIT`→`请在音响里操作`；非仪表模式首行复刻 Qt 提示 Text。`make_row()` 的行标签改为 `LV_LABEL_LONG_CLIP`，中文 24px 超宽时按行宽裁剪，不再换行撑破行高。字库由 `tools/settings_font.py` 从翻译表重生成并提交。
+  - 另修复 `date_wheel_refresh()` 的 `char text[16]` 截断（`TIME FORMAT: 24h` 被截成 `TIME FORMAT: 24`）。
+- **验证**：`cmake --build build -j8` 无告警；`cd build && ctest --output-on-failure` **8/8 通过**，其中 `carmw_steering_key` **7777 checks / 0 failures**（覆盖非仪表/仪表两套行数、滚轮进入与列推进、年列边界、月日取模与 2 月截断、确认下发与非法日期拒绝、时间制式 units、草稿回读、系统摘要、中文标题/三行文案/确认按钮/非仪表提示与中文字宽）。互联页确认“仅保存配置、不下发串口命令”（原断言 4 条命令已按代码实际语义修正）。
+- **滚轮入场动画（2026-11-13）**：按 Qt `dateTimeItem` 的 `NumberAnimation`（`running: instrumentMode && itemIndex === 0`，400ms InOutQuad，scale 0.8→1）新增 `date_wheel_group` 容器承载背景与 5 列；选中滚轮行时用 `lv_anim` 动画 `transform_scale` 204→256，重复进入重播。验证：PC gdb 断点确认 `date_wheel_animate` 在 `date_item` 变为 0 时触发、`date_wheel_scale_cb` 首帧值为 204；`ctest` 8/8，BOARD 交叉构建通过。
+- **Linux 系统时间同步（2026-11-13）**：对齐 Qt `SettingsManager::setSystemTimer`，`date_save()` 在下发 0x32 后调用 `date_apply_system_time()`：板端 `mktime` + `clock_settime(CLOCK_REALTIME)` 写系统时间，成功后 `system("hwclock -w")` 写 RTC；PC 构建为空实现，避免改开发机时间。板端编译需 `_POSIX_C_SOURCE=200809L`（已在文件头按 `CARMW_PLATFORM_BOARD` 条件定义）。验证：PC/BOARD 构建均通过，`ctest` 8/8；实际写时钟需板端 root 权限与实机验收。
+- **未完成/待验证**：板端滚轮文本字号/行高与中文裁剪的视觉验收未做；板端系统时间/RTC 写入需 root 实测；设置根页初始焦点仍按现有实现停在时间源行（Qt 默认 `itemIndex=0`），如需完全对齐可单独调整。
+- **PC 键盘按键修复（2026-11-13）**：`main.c` 的 `poll_keys()` 原先方向键固定发 `UI_KEY_PREV/NEXT`，而设置页只处理 `UI_KEY_UP/DOWN/LEFT/RIGHT`；且 Enter 打开设置后不再转发 OK。改为：设置页可见时方向键发方向码、Enter 转发 OK；其余场景保持“←/↑ 上一张卡片、→/↓ 下一张卡片”。设置根页首次按方向键会先选中首张卡片（`root_index` 由 NONE 置 0），到 SYSTEM 需再按 3 次。
+- **PC 验证开关（2026-11-13）**：`main.c` 新增 PC 专用 `--settings`，假 MCU 车速置 0（绕过设置页 `speed<5` 门控）并每周期上报 0x05 系统设置 `time_source=2`（仪表），使 PC 界面可直接进入 5 列滚轮分支；默认演示与板端行为不变。验证：带/不带开关冒烟均正常，gdb 断点确认 `ui_settings_page_set_date` 的 `source` 分别为 2 / 0，且 `--settings` 下打开设置后 `ui_app_settings_visible()` 为 true；`ctest` 8/8、`carmw_steering_key` 7777 checks / 0 failures。
 
 **性能记录（2026-11-07，板端中间卡片切换卡顿）**
 
@@ -2295,25 +2511,7 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 
 **验收**：真实手机分别验证纳入范围的连接模式、连入/断开/重连、进退互联、按键、样式切换、退出后仪表恢复及视频层清理；分别报告视频/音频完成度，记录CPU/内存/FPS与回调生命周期。
 
-### 14.11 步骤6.7：升级状态、界面与平台后端
-
-**边界**：先做契约与UI/服务状态迁移，未经明确批准不执行真实APP替换、MCU烧写、系统更新或重启。普通PC回归只使用隔离临时目录与明确标注的模拟后端，不自动扫描并执行真实设备升级。
-
-**操作步骤**
-
-1. 核对USB检测、挂载点、包类型、目标组件/版本/架构、依赖顺序、校验、磁盘空间、电源条件及失败恢复契约；确认是否保留Qt自动触发行为，不能悄悄新增或修改入口。
-2. 先定义状态机：空闲、发现候选包、校验、等待确认（如获批准采用）、执行、分项结果、总体结果、等待重启。UI只显示后端报告，不自行推测成功。
-3. 迁移升级进度/结果界面及仪表遮挡；总体成功必须由真实分项结果计算。Qt已读路径计算了`overallSuccess`却发送固定true，此偏差必须明确修正，不能照搬或伪报成功。
-4. APP/资源更新确认兼容关系、暂存和恢复方式；仅有car_A/car_B常量不足以证明A/B切换与回滚已实现。
-5. MCU升级先确认业务串口停止、升级串口独占、失败释放、业务恢复和通信状态通知；界面不可因耗时传输冻结。Qt独立MCU入口与恢复升级部分被注释，不能按现成闭环处理。
-6. 系统组件更新与整机镜像升级分开定义；Qt现有文件复制流程不等同完整OTA。
-7. 校验不仅要判断传输完整性，还需确认包的可信来源及目标兼容性；MD5不能单独作为真实性认证依据。认证方案由实际平台契约决定，不臆造已有签名服务。
-8. 所有组件结果到齐后再决定是否请求重启；重启策略与用户交互单独确认，不照搬“5秒自动重启”作为默认行为。
-9. 板端验收前准备可恢复台架、备份和恢复途径；实际更新、掉电/恢复验证需单独批准，不由普通自动化测试触发。
-
-**验收**：隔离模拟环境验证正常成功、普通文件校验失败、取消、磁盘写入失败、设备断开、串口不可用、分项失败、总体结果及重启条件；真实后端逐组件台架验收，未验证恢复能力时不得写“可回滚”。
-
-### 14.12 步骤6.8：集成与最终验收
+### 14.11 步骤6.7：集成与最终验收
 
 1. PC先跑全量已有CTest，再运行新增设置/状态路由/按键顺序/平台适配测试；断言从Qt业务顺序推导，不按当前运行结果改期望值。生产pump和分层接口都覆盖。
 2. 逐菜单对照Qt，记录根分类、焦点、选中态、文案、中文缺字、字号、布局、返回和超时；无显示环境则标记视觉未验，不用对象树测试代替截图。
@@ -2324,7 +2522,7 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 7. 按当前T507工具链构建Release，记录程序/必要资源/配置版本及校验值，说明部署和恢复步骤；未实际部署或未在板上执行的项目保持待验证。
 8. 回填每个子任务的变更、实际命令/退出码、PC结果、板端证据、偏差与依赖。完成部分功能不等于阶段6整体完成。
 
-### 14.13 执行前需确认与首批建议
+### 14.12 执行前需确认与首批建议
 
 需确认：
 
@@ -2333,11 +2531,18 @@ PC 验证：6 个测试二进制全部 OK；板端 `build_board` 通过，`bin/c
 - 原Qt配置是否需要导入，是否已有可提供的实际配置；配置目录与写入权限如何安排。
 - 阶段6中文字体/视觉要求，以及卡片全部关闭时的产品行为。
 - T507 SDK/动态库/视频图层/音频后端是否齐备，哪些互联模式本轮必须可用。
-- 升级是否包含真实后端，包来源/恢复方式、USB自动触发/确认/重启策略如何确定。
 
-**推荐首批只执行6.0～6.2**：冻结Qt契约 → 设置模型与存储 → 设置栈和完整按键路由。首批验收目标是“普通仪表翻卡不退化、23按真实条件进入设置骨架、设置内可导航、13按Qt返回、26短长按正确、31逐事件按合法风格处理”。没有SDK时不把CarPlay占位视为完成，也不在首批引入真实升级。
+**推荐首批只执行6.0～6.2**：冻结Qt契约 → 设置模型与存储 → 设置栈和完整按键路由。首批验收目标是“普通仪表翻卡不退化、23按真实条件进入设置骨架、设置内可导航、13按Qt返回、26短长按正确、31逐事件按合法风格处理”。没有SDK时不把CarPlay占位视为完成。
 
-本节获用户确认后再进入实现；未确认项只更新文档，不修改功能代码、不部署、不执行升级。
+本节获用户确认后再进入实现；未确认项只更新文档，不修改功能代码、不部署。
 
 **2026-11-05 用户确认并已实施**：首批范围收敛为“仅设置模型 + ACC关闭统一保存”，不迁移设置菜单、不接管现有UI设置项；ACC来源为中间件cmdid 0x34；配置路径`/opt/car_dashboard/setting.cfg`，不导入Qt旧配置；ACC以收到真实帧为准；3秒窗口内重新开启允许重开且不取消已发起的保存。实现明细与PC验证见14.5“实现状态”，板端端到端保存与恢复仍待验证。
+
+**2026-11-17 字体专项**：按用户“车速规则先不改，恢复原字体字号”要求接入 Qt 原有明确字体族和字号，修复中文大字号缩小与互联英文裁切；未明确的 Qt 默认拉丁字体暂保留 Montserrat。Windows 临时无窗口验证工程 7/7 组通过，字体专项含截图 987 项、0 失败；Linux/板端与 Qt 像素级对照尚未验证。映射、资源生成方式、限制与实际渲染预览见 [FONT_PORT.md](FONT_PORT.md)。该结果仅属于字体专项，不代表阶段6整体验收完成。
+
+**2026-11-17 设置显示对齐**：用户反馈设置显示差异后，恢复固定横排分类及红条、透明背景、分类/压栈子页层级和列表视口；修复日期摘要覆盖名称，系统列表改为名称/摘要分列；中心卡片 X 改为勾号，处理长文字与翻译缓存。Windows 临时工程7/7回归通过，实际渲染专项992项、0失败；本轮无Linux/板端构建或实机验收。仍有双选项开关、亮度条、互联蓝牙卡片和动画差异，未宣称全部设置视觉移植完成，详见 [SETTINGS_VISUAL_PORT.md](SETTINGS_VISUAL_PORT.md)。
+
+**2026-11-17 设置快速切换性能**：针对约4fps反馈，确认当前BOARD构建没有优化选项，改为默认Release并实际使用`-O3 -DNDEBUG`重建；设置更新缩小到可见分支，取消同列表重复hide/show及重复apply，缓存文本/翻译/系统版本，相同数据停止重复绘制。日志区分handler_hz和实际绘制fps，增加render与flush耗时。Windows8/8、Linux Release11/11通过，渲染专项992项0失败；AArch64产物已更新，尚未部署或完成板端性能复测。详细证据与产物SHA256见 [SETTINGS_PERFORMANCE.md](SETTINGS_PERFORMANCE.md)。
+
+**2026-11-17 英文温度符号**：Bebas 原字体缺少度数符号；在28px字库中仅合入同字号 Noto Sans CJK SC 的 U+00B0，并同步生成器与manifest。补回归覆盖摄氏/华氏和中英往返，实际画面可显示25.0°C、77.0°F；Windows8/8、Linux11/11通过，含画面字体检查1037项0失败。Release/AArch64程序已重建，未部署；最新产物SHA256和渲染图见 [FONT_PORT.md](FONT_PORT.md)。
 

@@ -273,16 +273,36 @@ typedef struct {
 } car_lane_assist_t;
 
 /*
- * 驾驶辅助三项的 MCU 真实状态（Qt SettingsMgr.emergencyBraking /
- * laneDepartureWarning / blindSpotWarning，由 0x16 SetGet 回读）。
- * 缺省 true 与 Qt 一致；valid 表示是否已收到过 MCU 回读。
+ * 驾驶辅助四项的 MCU 真实状态（Qt SettingsMgr.emergencyBraking /
+ * laneDepartureWarning / blindSpotWarning / steeringMode，由 0x16 SetGet 回读）。
+ * 缺省 true 与 Qt 一致；steering_mode 为选项值（Qt 缺省 0 = 常规），
+ * valid 表示是否已收到过 MCU 回读。
  */
 typedef struct {
     bool emergency_braking;
     bool lane_departure_warning;
     bool blind_spot_warning;
+    uint8_t steering_mode; /* index 9：0 常规 / 1 运动（Qt steeringMode） */
     bool valid;
 } car_driver_assist_t;
+
+/*
+ * 驻车辅助与底盘控制（Qt ParkAssist.qml / ChassistControl.qml），
+ * 同样只保存 MCU 0x16 SetGet 回读值，UI 不本地翻转。
+ */
+typedef struct {
+    bool moving_object;           /* index 4  移动物体 */
+    bool front_radar;             /* index 5  前方雷达 */
+    bool rear_radar;              /* index 6  倒车雷达 */
+    bool radar_display;           /* index 7  雷达显示 */
+    bool rear_cross_traffic;      /* index 26 倒车侧预警（Qt rearCrossTrafficAlert） */
+    uint8_t radar_volume;         /* index 17 雷达报警音量：0 低 / 1 中 / 2 高 */
+    uint8_t radar_distance;       /* index 18 雷达探测距离：0 近 / 1 中 / 2 远 */
+    uint8_t parking_sensor;       /* index 27 驻车辅助传感器：0 OFF / 1 ON / 2 仅前方 */
+    bool active_trace_control;    /* index 8  主动弯道控制 */
+    bool active_engine_brake;     /* index 19 主动发动机制动 */
+    bool valid;
+} car_parking_chassis_t;
 
 /*
  * 车辆设置项（Qt SettingsMgr，由 0x16 SetGet 的 0x86 ack 回读）。
@@ -292,13 +312,19 @@ typedef struct {
 typedef struct {
     bool welcome_light;           /* index 10 迎宾灯 */
     bool auto_interior_light;     /* index 11 室内自动点灯 */
+    bool lane_change_flash;       /* index 12 变更车道闪灯3次 */
     bool external_doors;          /* index 13 外部车门开关 */
     bool single_door_unlock;      /* index 14 单车门解锁 */
     bool horn_feedback;           /* index 15 喇叭响应 */
     uint8_t auto_door_unlock;     /* index 16 车门自动解锁：0 点火关闭 / 1 P 挡 / 2 OFF */
     bool smart_door_unlock;       /* index 24 智能钥匙车门上锁 */
     bool select_unlock;           /* index 25 选择解锁 */
+    bool remote_engine_start;     /* index 23 远程启动发动机 */
+    bool rain_sensing_wipers;     /* index 20 速度感应式雨刷器 */
+    bool rear_wiper_reverse_linkage; /* index 21 后雨刷倒挡联动 */
+    bool wiper_mist_mode;         /* index 22 残留雨滴清除 */
     uint8_t auto_door_lock;       /* index 28 车门自动上锁：0 车速 / 1 P 挡 / 2 OFF */
+    bool rain_sensor;             /* index 29 雨量传感器 */
     uint8_t headlight_sensitivity;/* index 33 点灯灵敏度：0~3 */
     uint8_t headlight_off_delay;  /* index 32 灯光关闭延时：0~7 */
     bool valid;                   /* 是否已收到过 MCU 回读 */
@@ -440,6 +466,9 @@ typedef struct {
     uint32_t set_km;
     int32_t now_km;
     uint8_t show_time;
+    uint32_t set_km_by_item[3];    /* 0 机油 / 1 轮胎 / 2 自定义 */
+    int32_t remain_km_by_item[3];
+    bool item_valid[3];
     bool valid;
 } car_maintenance_t;
 
@@ -533,6 +562,8 @@ typedef struct {
     car_func_config_t func_config;
     /* 车身颜色：Qt SettingsMgr.carColor 的本地映射，不由串口帧产生 */
     car_color_t car_color;
+    /* Qt SettingsMgr.rightHandDrive，本地显示配置，默认左舵。 */
+    bool right_hand_drive;
     /* 车外温度显隐：Qt SettingsMgr.outTemperature 的本地映射，缺省关闭 */
     bool outside_temp_on;
     /* 档位显隐：Qt SettingsMgr.gearOnOff 的本地映射，缺省开启 */
@@ -559,10 +590,16 @@ typedef struct {
     car_driver_assist_t driver_assist;
     /* 车辆设置项：灯光/车门等开关的 MCU 回读真实状态 */
     car_vehicle_setting_t vehicle_setting;
+    /* 驻车辅助 / 底盘控制：MCU 回读真实状态 */
+    car_parking_chassis_t parking_chassis;
     /* 雷达显示开关：Qt SettingsMgr.radaronoff（实为“雷达开启”），缺省开启 */
     bool radar_on;
+    bool factory_hide_tire;
+    bool factory_hide_door;
     /* 四驱灯/提示可见性：Qt SettingsMgr.show4h，缺省关闭 */
     bool show_4h;
+    /* 自动启停灯可见性：Qt SettingsMgr.enableAutoStop，缺省关闭 */
+    bool factory_auto_stop;
     /* 互联（CarPlay/AA/HiCar）会话进行中：Qt GlobalData.items.carPlayModel */
     bool carplay_active;
 } car_state_t;//cmd_id

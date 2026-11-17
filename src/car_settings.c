@@ -30,6 +30,11 @@ void car_settings_reset(car_settings_t *settings)
     }
 
     memset(settings, 0, sizeof(*settings));
+    settings->values.language = 1U;
+    settings->values.factory_features = 0x7ffU;
+    settings->values.tire_on = 1U;
+    settings->values.door_on = 1U;
+    settings->values.fuel_tank = 57U;
     settings->values.unit_mileage = (uint8_t)CAR_UNIT_METRIC;
     settings->values.unit_temperature = (uint8_t)CAR_UNIT_METRIC;
     settings->values.dark_mode = 0U;
@@ -45,6 +50,7 @@ void car_settings_reset(car_settings_t *settings)
     settings->values.eco_or_fuel = 1U;     /* Qt ecoOrfuel 缺省 true（油门引导/圆环） */
     settings->values.radar_on = 1U;        /* Qt radaronoff 实为雷达开启，缺省 true */
     settings->values.show_4h = 0U;         /* Qt show4h 缺省 false */
+    settings->values.car_color_rgb = UINT32_C(0x004a6b);
     /* Qt EcoavgShow 的 historyModel 初始为 9.0 / 10.5 / 8.0 / 9.2 */
     settings->values.eco_history_x10[0] = 90U;
     settings->values.eco_history_x10[1] = 105U;
@@ -138,7 +144,35 @@ static void parse_line(car_settings_t *settings, char *line)
         ++value;
     }
 
-    if(strcmp(key, "unit_mileage") == 0) {
+    if(strcmp(key, "language") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= 1U) settings->values.language = parsed;
+    }
+    else if(strcmp(key, "factory_features") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= 0x7ffU) settings->values.factory_features = parsed;
+    }
+    else if(strcmp(key, "fuel_tank") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && (parsed == 57U || parsed == 69U)) settings->values.fuel_tank = parsed;
+    }
+    else if(strcmp(key, "tire_on") == 0 || strcmp(key, "door_on") == 0 || strcmp(key, "fuel_filler_right") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= 1U) {
+            if(strcmp(key, "tire_on") == 0) settings->values.tire_on = parsed;
+            else if(strcmp(key, "door_on") == 0) settings->values.door_on = parsed;
+            else settings->values.fuel_filler_right = parsed;
+        }
+    }
+    else if(strcmp(key, "connect_enabled") == 0 || strcmp(key, "connect_mode") == 0) {
+        uint32_t parsed;
+        bool mode = strcmp(key, "connect_mode") == 0;
+        if(parse_u32(value, &parsed) && parsed <= (mode ? 2U : 1U)) {
+            if(mode) settings->values.connect_mode = (uint8_t)parsed;
+            else settings->values.connect_enabled = (uint8_t)parsed;
+        }
+    }
+    else if(strcmp(key, "unit_mileage") == 0) {
         uint32_t parsed = 0U;
 
         if(parse_u32(value, &parsed) && valid_unit((uint8_t)parsed)) {
@@ -232,6 +266,24 @@ static void parse_line(car_settings_t *settings, char *line)
 
         if(parse_u32(value, &parsed) && parsed <= 1U) {
             settings->values.show_4h = (uint8_t)parsed;
+        }
+    }
+    else if(strcmp(key, "car_color_rgb") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= UINT32_C(0xffffff)) {
+            settings->values.car_color_rgb = parsed;
+        }
+    }
+    else if(strcmp(key, "animation_style") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= 1U) {
+            settings->values.animation_style = (uint8_t)parsed;
+        }
+    }
+    else if(strcmp(key, "right_hand_drive") == 0) {
+        uint32_t parsed;
+        if(parse_u32(value, &parsed) && parsed <= 1U) {
+            settings->values.right_hand_drive = (uint8_t)parsed;
         }
     }
     else if(strncmp(key, "eco_history", 11) == 0) {
@@ -333,6 +385,15 @@ static bool mark_changed(car_settings_t *settings, uint32_t mask)
     }
 
     return true;
+}
+
+bool car_settings_set_connect(car_settings_t *settings, bool enabled, uint8_t mode)
+{
+    if(!settings || mode > 2U || (settings->values.connect_enabled == (uint8_t)enabled &&
+                                settings->values.connect_mode == mode)) return false;
+    settings->values.connect_enabled = enabled;
+    settings->values.connect_mode = mode;
+    return mark_changed(settings, CAR_SETTINGS_CHANGED_CONNECT);
 }
 
 bool car_settings_set_unit(car_settings_t *settings,
@@ -502,6 +563,27 @@ bool car_settings_set_radar_on(car_settings_t *settings, bool on)
                     CAR_SETTINGS_CHANGED_RADAR);
 }
 
+bool car_settings_set_animation_style(car_settings_t *settings, uint8_t style)
+{
+    if(settings == NULL || style > 1U || settings->values.animation_style == style) {
+        return false;
+    }
+    settings->values.animation_style = style;
+    return mark_changed(settings, CAR_SETTINGS_CHANGED_ANIMATION);
+}
+
+bool car_settings_set_appearance(car_settings_t *settings, uint32_t rgb, bool right_hand)
+{
+    if(settings == NULL || rgb > UINT32_C(0xffffff) ||
+       (settings->values.car_color_rgb == rgb &&
+        settings->values.right_hand_drive == (uint8_t)right_hand)) {
+        return false;
+    }
+    settings->values.car_color_rgb = rgb;
+    settings->values.right_hand_drive = (uint8_t)right_hand;
+    return mark_changed(settings, CAR_SETTINGS_CHANGED_APPEARANCE);
+}
+
 bool car_settings_set_show_4h(car_settings_t *settings, bool on)
 {
     if(settings == NULL) {
@@ -551,6 +633,28 @@ bool car_settings_eco_history_reset(car_settings_t *settings)
 
     return dirty ? mark_changed(settings, CAR_SETTINGS_CHANGED_ECO_HISTORY)
                  : false;
+}
+
+bool car_settings_set_language(car_settings_t *settings, uint8_t language)
+{
+    if(!settings || language > 1U || settings->values.language == language) return false;
+    settings->values.language = language;
+    return mark_changed(settings, UINT32_C(1) << 19);
+}
+
+bool car_settings_set_factory(car_settings_t *settings, uint16_t features,
+                              bool tire, bool door, bool filler_right, uint8_t tank)
+{
+    if(!settings || features > 0x7ffU || (tank != 57U && tank != 69U)) return false;
+    car_settings_values_t *v = &settings->values;
+    if(v->factory_features == features && v->tire_on == tire && v->door_on == door &&
+       v->fuel_filler_right == filler_right && v->fuel_tank == tank) return false;
+    v->factory_features = features;
+    v->tire_on = tire;
+    v->door_on = door;
+    v->fuel_filler_right = filler_right;
+    v->fuel_tank = tank;
+    return mark_changed(settings, UINT32_C(1) << 20);
 }
 
 uint64_t car_settings_snapshot(car_settings_t *settings, car_settings_t *out)
@@ -660,7 +764,13 @@ static bool write_config(const char *path, const char *tmp_path,
                    "eco_history2=%u\n"
                    "eco_history3=%u\n"
                    "radar_on=%u\n"
-                   "show_4h=%u\n",
+                   "show_4h=%u\n"
+                   "car_color_rgb=%lu\n"
+                   "right_hand_drive=%u\n"
+                   "animation_style=%u\n"
+                   "connect_enabled=%u\n"
+                   "connect_mode=%u\n"
+                   "language=%u\nfactory_features=%u\ntire_on=%u\ndoor_on=%u\nfuel_filler_right=%u\nfuel_tank=%u\n",
                    SETTINGS_SECTION, (unsigned)values->unit_mileage,
                    (unsigned)values->unit_temperature,
                    (unsigned)values->dark_mode, values->dial_style,
@@ -678,7 +788,15 @@ static bool write_config(const char *path, const char *tmp_path,
                    (unsigned)values->eco_history_x10[2],
                    (unsigned)values->eco_history_x10[3],
                    (unsigned)values->radar_on,
-                   (unsigned)values->show_4h);
+                   (unsigned)values->show_4h,
+                   (unsigned long)values->car_color_rgb,
+                   (unsigned)values->right_hand_drive,
+                   (unsigned)values->animation_style,
+                   (unsigned)values->connect_enabled,
+                   (unsigned)values->connect_mode,
+                   (unsigned)values->language, (unsigned)values->factory_features,
+                   (unsigned)values->tire_on, (unsigned)values->door_on,
+                   (unsigned)values->fuel_filler_right, (unsigned)values->fuel_tank);
     if(len < 0 || (size_t)len >= sizeof(text)) {
         return false;
     }

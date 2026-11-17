@@ -175,9 +175,9 @@ static void chart_create(page4i_card_t *card, lv_obj_t *content)
     lv_obj_set_size(scale, CHART_W, SCALE_H);
     lv_obj_set_pos(scale, 0, SCALE_Y);
 
-    (void)label(scale, 0, 0, 60, "0", &lv_font_montserrat_22, LV_TEXT_ALIGN_LEFT);
-    (void)label(scale, 0, 0, CHART_W, "50", &lv_font_montserrat_22, LV_TEXT_ALIGN_CENTER);
-    (void)label(scale, CHART_W - 70, 0, 70, "100 %", &lv_font_montserrat_22, LV_TEXT_ALIGN_RIGHT);
+    (void)label(scale, 0, 0, 60, "0", UI_TEXT_BOLD(22), LV_TEXT_ALIGN_LEFT);
+    (void)label(scale, 0, 0, CHART_W, "50", UI_TEXT_BOLD(22), LV_TEXT_ALIGN_CENTER);
+    (void)label(scale, CHART_W - 70, 0, 70, "100 %", UI_TEXT_BOLD(22), LV_TEXT_ALIGN_RIGHT);
 
     card->fill_front = bar_create(chart, SCALE_Y - 10 - BLOCK_H, true);
     card->fill_rear = bar_create(chart, SCALE_Y + SCALE_H + 10, false);
@@ -198,7 +198,7 @@ bool page4i_card_create(page4i_card_t *card, lv_obj_t *parent)
 
     /* 标题 "4x4-i"：28 号，水平居中，距顶 20 */
     (void)label(card->root, 0, 20, CARD_W, "4x4-i",
-                &lv_font_montserrat_28, LV_TEXT_ALIGN_CENTER);
+                UI_TEXT_BOLD(28), LV_TEXT_ALIGN_CENTER);
 
     content = ui_blank_container(card->root);
     lv_obj_set_size(content, CONTENT_W, CONTENT_H);

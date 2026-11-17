@@ -59,6 +59,7 @@ bool rotate_forester1_create(rotate_forester1_t *rotate, lv_obj_t *parent,
     }
 
     rotate->highlight = -1;
+    rotate->zero_large = true;
 
     if(!ui_assets_load_image(&s_needle, "SubaruForester/rotate_point1.png")) {
         return false;
@@ -68,12 +69,12 @@ bool rotate_forester1_create(rotate_forester1_t *rotate, lv_obj_t *parent,
                    "SubaruForester/rotate1_bg.png", &s_needle,
                    NEEDLE_X, NEEDLE_Y, NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, 1800);
 
-    ui_dial_add_text(&rotate->dial, "x1000/min", 270, 350, UI_FONT_SM);
+    ui_dial_add_text(&rotate->dial, "x1000/min", 270, 350, UI_TEXT(20));
 
-    /* "0" 位置固定，Qt 里恒为 48 号字（rpm 极低时会变 48，正常也是最大档） */
-    rotate->zero = ui_dial_add_text(&rotate->dial, "0", 290, 500, UI_FONT_3XL);
+    /* Qt uses 48px below/equal to 200 rpm and 44px otherwise. */
+    rotate->zero = ui_dial_add_text(&rotate->dial, "0", 290, 500, UI_KONEXY(48));
 
-    ui_dial_add_labels(&rotate->dial, s_labels, ROTATE_F1_LABEL_COUNT, UI_FONT_2XL,
+    ui_dial_add_labels(&rotate->dial, s_labels, ROTATE_F1_LABEL_COUNT, UI_KONEXY(44),
                        rotate->labels, ROTATE_F1_LABEL_COUNT);
 
     return true;
@@ -90,6 +91,12 @@ void rotate_forester1_apply(rotate_forester1_t *rotate, uint32_t engine_rpm)
     /* 指针角度：180° - rpm × 0.024，换成 LVGL 的 0.1° 单位 */
     ui_dial_set_angle(&rotate->dial, 1800 - (int32_t)engine_rpm * 6 / 25);
 
+    bool zero_large = engine_rpm <= 200U;
+    if(zero_large != rotate->zero_large) {
+        rotate->zero_large = zero_large;
+        lv_obj_set_style_text_font(rotate->zero, UI_KONEXY(zero_large ? 48 : 44), 0);
+    }
+
     /* 找出当前转速命中的刻度 */
     for(size_t i = 0; i < ROTATE_F1_LABEL_COUNT; i++) {
         if(is_hit(i, engine_rpm)) {
@@ -105,7 +112,7 @@ void rotate_forester1_apply(rotate_forester1_t *rotate, uint32_t engine_rpm)
     rotate->highlight = target;
 
     for(size_t i = 0; i < ROTATE_F1_LABEL_COUNT; i++) {
-        const lv_font_t *font = ((int32_t)i == target) ? UI_FONT_3XL : UI_FONT_2XL;
+        const lv_font_t *font = ((int32_t)i == target) ? UI_KONEXY(48) : UI_KONEXY(44);
 
         lv_obj_set_style_text_font(rotate->labels[i], font, 0);
     }

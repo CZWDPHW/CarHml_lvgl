@@ -11,6 +11,11 @@
 #include "ui/PageModel/page_short_term.h"
 #include "ui/SpeedDial/speed_forester1.h"
 #include "ui/overlays/ov_cruise.h"
+#include "ui/overlays/ov_door.h"
+#include "ui/ComControl/ui_small_door.h"
+#include "ui/ui_assets.h"
+#include "ui/ui_common.h"
+#include "../third_party/lvgl/src/draw/lv_image_decoder_private.h"
 #include "ui/overlays/ov_tips.h"
 #include "ui/overlays/ov_tire.h"
 #include "ui/ui_app.h"
@@ -302,6 +307,15 @@ static void state_set_radar(car_state_t *st, bool on)
  * C2：覆盖层组合与中心卡片恢复（基线：车门 > 胎压 > 巡航 > 雷达）。
  * 页面级断言全部通过 ui_app 的真实快照分发路径，不直接调用覆盖层对象。
  */
+static unsigned cleanup_calls;
+static unsigned cleanup_fake_status;
+static bool cleanup_fake_start(void)
+{
+    ++cleanup_calls;
+    return false;
+}
+static unsigned cleanup_fake_poll(void) { return cleanup_fake_status; }
+
 static void test_system_version_settings(void)
 {
     ui_settings_page_t page = {0};
@@ -318,14 +332,47 @@ static void test_system_version_settings(void)
     CHECK(ui_settings_page_key(&page, &key));
     CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
     CHECK(lv_obj_get_child(page.system_rows[0], 0) != NULL);
-    CHECK(lv_obj_get_style_text_color(lv_obj_get_child(page.system_rows[0], 0), 0).red ==
+    CHECK(lv_obj_get_style_text_color(lv_obj_get_child(page.system_rows[0], 0), 0).red !=
           lv_color_hex(0x848484).red);
 
     key.code = UI_KEY_DOWN;
     CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 0U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 1U);
+    CHECK(ui_settings_page_key(&page, &key));
     CHECK(page.st.system_index == UI_SETTINGS_SYSTEM_VERSION);
     CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 3U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 4U);
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_CLEAR_LOG);
+    CHECK(page.st.date_index == 1U);
+    ui_settings_page_set_cleanup_cb(cleanup_fake_start, cleanup_fake_poll);
+    CHECK(ui_settings_page_key(&page, &key)); /* default cancel */
+    CHECK(cleanup_calls == 0U);
+    CHECK(ui_settings_page_key(&page, &key)); /* reopen */
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(cleanup_calls == 1U);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.date_rows[2], 0)),
+                 "FAILED / PARTIAL CLEANUP") == 0);
+    CHECK(ui_settings_page_back(&page));
+    ui_settings_page_set_cleanup_cb(NULL, NULL);
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == UI_SETTINGS_SYSTEM_ANIMATION);
+    CHECK(ui_settings_page_key(&page, &key));
     CHECK(page.st.system_index == UI_SETTINGS_SYSTEM_BACK);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 0U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.system_index == 1U);
     CHECK(ui_settings_page_key(&page, &key));
     CHECK(page.st.system_index == UI_SETTINGS_SYSTEM_VERSION);
 
@@ -821,6 +868,81 @@ static void test_lamp_4h_gate(lv_obj_t *screen)
     lv_obj_delete(holder);
 }
 
+/* Qt 森林人自动启停灯位（码 27，工厂功能位 bit10 + 300ms/3000ms 快慢闪） */
+static const ui_lamp_group_item_t s_auto_stop_gate_items[] = {
+    { .variants = {{"WarnIcon/217.png", 27U, 0U}}, .variant_count = 1,
+      .x = 0, .y = 0, .w = 64, .h = 64, .gate = UI_LAMP_GATE_AUTO_STOP },
+};
+
+static void test_lamp_auto_stop_gate(lv_obj_t *screen)
+{
+    const uint8_t on27[2] = {1U, 27U};
+    const uint8_t fast27[2] = {2U, 27U};
+    const uint8_t slow27[2] = {3U, 27U};
+    const uint8_t clear27[2] = {0U, 27U};
+    car_state_t st;
+    ui_lamp_group_t group = {0};
+    lv_obj_t *holder = lv_obj_create(screen);
+
+    car_state_init(&st);
+    CHECK(!st.factory_auto_stop);
+    CHECK(ui_lamp_group_create(&group, holder, s_auto_stop_gate_items, 1U));
+
+    /* Qt m_enableAutoStop 缺省 false：即使 MCU 点亮 27，灯位也保持熄灭 */
+    CHECK(car_decode_warnings(on27, 2, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_OFF);
+
+    /* 打开工厂功能位后同一故障码恢复点亮 */
+    st.factory_auto_stop = true;
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_ON);
+
+    /*
+     * 码 27 特判：快闪 300ms（半周期 150ms）、慢闪 3000ms（半周期 1500ms），
+     * 不是整组默认的 600ms/6000ms。
+     */
+    CHECK(car_decode_warnings(fast27, 2, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_BLINK);
+    CHECK(group.items[0].lamp.blink_ms == 300U);
+    CHECK(!lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    lv_tick_inc(149);
+    (void)lv_timer_handler();
+    CHECK(!lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    lv_tick_inc(1);
+    (void)lv_timer_handler();
+    CHECK(lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    CHECK(car_decode_warnings(slow27, 2, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_BLINK);
+    CHECK(group.items[0].lamp.blink_ms == 3000U);
+    CHECK(!lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    lv_tick_inc(1499);
+    (void)lv_timer_handler();
+    CHECK(!lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    lv_tick_inc(1);
+    (void)lv_timer_handler();
+    CHECK(lv_obj_has_flag(group.items[0].lamp.img, LV_OBJ_FLAG_HIDDEN));
+
+    /* 故障消失后熄灭；工厂位关闭同样熄灭 */
+    CHECK(car_decode_warnings(clear27, 2, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_OFF);
+
+    st.factory_auto_stop = false;
+    CHECK(car_decode_warnings(on27, 2, &st));
+    ui_lamp_group_apply(&group, &st);
+    check_group_state(&group, 0U, UI_LAMP_OFF);
+
+    lv_obj_delete(holder);
+}
+
 /* 快闪 600ms / 慢闪 6000ms：虚拟时钟推进，重复 apply 不得重置相位 */
 static const ui_lamp_group_item_t s_c3_blink_items[] = {
     { .variants = {{"WarnIcon/oil.png", 9U, 0U}}, .variant_count = 1,
@@ -1047,7 +1169,8 @@ static void check_restored_state(lv_obj_t *page)
 
     label140 = find_label_text(dial, "140");
     CHECK(label140 != NULL);
-    CHECK(lv_obj_get_style_text_font(label140, 0) == UI_FONT_LG);
+    CHECK(lv_obj_get_style_text_font(label140, 0) == UI_KONEXY(24));
+    CHECK(lv_obj_get_style_transform_scale_x(label140, 0) == 307);
     CHECK(find_label_text(dial, "km/h") != NULL);
 
     CHECK(strcmp(lv_label_get_text(row_value(odo)), "5000 KM") == 0);
@@ -1587,8 +1710,10 @@ static void test_speed_units(lv_obj_t *parent)
     CHECK(sp.highlight == 5);
     CHECK(strcmp(lv_label_get_text(sp.labels[5]), "100") == 0);
     f5 = lv_obj_get_style_text_font(sp.labels[5], 0);
-    CHECK(f5 == UI_FONT_LG);
-    CHECK(lv_obj_get_style_text_font(sp.labels[0], 0) == UI_FONT_MD);
+    CHECK(f5 == UI_KONEXY(24));
+    CHECK(lv_obj_get_style_transform_scale_x(sp.labels[5], 0) == 307);
+    CHECK(lv_obj_get_style_text_font(sp.labels[0], 0) == UI_KONEXY(24));
+    CHECK(lv_obj_get_style_transform_scale_x(sp.labels[0], 0) == 256);
     CHECK(strcmp(lv_label_get_text(sp.unit), "km/h") == 0);
     lv_tick_inc(100);
     lv_anim_refr_now();
@@ -1708,6 +1833,34 @@ static void test_fuel_threshold(lv_obj_t *parent)
 
     fuel_forester1_apply(&f, 25U);
     CHECK(f.low);
+
+    lv_obj_delete(f.root);
+}
+
+/* 加油口方向图标：左/右 × 白/黄（Qt 通用油量图标 by fuelFillerLeft + fuelStateIcon） */
+static void test_fuel_port(lv_obj_t *parent)
+{
+    fuel_forester1_t f = {0};
+
+    CHECK(fuel_forester1_create(&f, parent, 0, 0));
+    CHECK(f.port_img != NULL);
+    /* 缺省左 + 白 */
+    CHECK(f.port_variant == 0);
+    CHECK(lv_image_get_src(f.port_img) == &f.port_dsc[0]);
+
+    fuel_forester1_apply_port(&f, true, 2U);
+    CHECK(lv_image_get_src(f.port_img) == &f.port_dsc[1]);
+
+    fuel_forester1_apply_port(&f, false, 0U);
+    CHECK(lv_image_get_src(f.port_img) == &f.port_dsc[2]);
+
+    fuel_forester1_apply_port(&f, false, 2U);
+    CHECK(lv_image_get_src(f.port_img) == &f.port_dsc[3]);
+
+    /* 重复同一状态不改图 */
+    const void *cached = lv_image_get_src(f.port_img);
+    fuel_forester1_apply_port(&f, false, 2U);
+    CHECK(lv_image_get_src(f.port_img) == cached);
 
     lv_obj_delete(f.root);
 }
@@ -2044,6 +2197,167 @@ static void test_warn_end_to_end(lv_obj_t *parent)
     car_link_deinit(&link);
 }
 
+/* 对真实素材逐像素检查裁剪后的水平反射，包含 alpha 和预乘标志。 */
+static void check_mirror_pixels(lv_obj_t *image, int32_t x, int32_t y,
+                                int32_t w, int32_t h)
+{
+    lv_image_decoder_dsc_t decoder = {0};
+    const char *source = lv_image_get_src(image);
+    CHECK(lv_image_decoder_open(&decoder, source, NULL) == LV_RESULT_OK);
+    if(decoder.decoded == NULL) return;
+    CHECK(ui_assets_mirror_image(image, true, x, y, w, h));
+    CHECK(lv_image_src_get_type(lv_image_get_src(image)) == LV_IMAGE_SRC_VARIABLE);
+    if(lv_image_src_get_type(lv_image_get_src(image)) == LV_IMAGE_SRC_VARIABLE) {
+        const lv_image_dsc_t *mirror = lv_image_get_src(image);
+        uint32_t size = lv_color_format_get_size(decoder.decoded->header.cf);
+        bool equal = true;
+        CHECK(mirror->header.w == w && mirror->header.h == h);
+        CHECK(mirror->header.flags ==
+              (decoder.decoded->header.flags & LV_IMAGE_FLAGS_PREMULTIPLIED));
+        for(int32_t row = 0; row < h; ++row) {
+            for(int32_t col = 0; col < w; ++col) {
+                if(memcmp(mirror->data + row * mirror->header.stride + col * size,
+                          decoder.decoded->data + (y + row) * decoder.decoded->header.stride +
+                          (x + w - 1 - col) * size, size) != 0) equal = false;
+            }
+        }
+        CHECK(equal);
+        uint32_t events = lv_obj_get_event_count(image);
+        CHECK(ui_assets_mirror_image(image, true, x, y, w, h));
+        CHECK(lv_image_get_src(image) == mirror);
+        CHECK(lv_obj_get_event_count(image) == events);
+        CHECK(ui_assets_mirror_image(image, false, x, y, w, h));
+        CHECK(mirror->data == NULL); /* 切回左舵立即释放像素 */
+        CHECK(lv_image_src_get_type(lv_image_get_src(image)) == LV_IMAGE_SRC_FILE);
+        CHECK(ui_assets_mirror_image(image, true, x, y, w, h));
+        CHECK(lv_obj_get_event_count(image) == events);
+        CHECK(ui_assets_mirror_image(image, false, x, y, w, h));
+    }
+    lv_image_decoder_close(&decoder);
+}
+
+static void test_right_hand_drive(void)
+{
+    car_state_t st;
+    ov_door_t door = {0};
+    ui_small_door_t small = {0};
+    car_state_init(&st);
+    CHECK(!st.right_hand_drive);
+    CHECK(ov_door_create(&door, lv_screen_active()));
+    check_mirror_pixels(door.left_front, 0, 0, 720, 550);
+    for(unsigned hand = 0; hand < 2; ++hand) {
+        st.right_hand_drive = hand != 0;
+        for(unsigned bit = 0; bit < 6; ++bit) {
+            st.doors.valid = true;
+            st.doors.left_front = bit == 0;
+            st.doors.right_front = bit == 1;
+            st.doors.left_rear = bit == 2;
+            st.doors.right_rear = bit == 3;
+            st.doors.trunk = bit == 4;
+            st.doors.hood = bit == 5;
+            ov_door_apply(&door, &st, false);
+            lv_obj_t *layers[] = {door.left_front, door.right_front, door.left_rear,
+                                  door.right_rear, door.trunk, door.hood};
+            for(unsigned i = 0; i < 6; ++i) {
+                unsigned expected = hand && bit < 4 ? bit ^ 1U : bit;
+                CHECK(lv_obj_has_flag(layers[i], LV_OBJ_FLAG_HIDDEN) == (i != expected));
+            }
+            lv_obj_update_layout(door.root);
+            CHECK(lv_obj_get_x(door.root) == (hand ? 590 : 620));
+            ov_door_apply(&door, &st, true);
+            CHECK(!ov_door_is_active(&door));
+        }
+    }
+    /* 保持门状态不变切回左舵，检查七层恢复文件源并释放镜像。 */
+    st.right_hand_drive = false;
+    ov_door_apply(&door, &st, false);
+    for(unsigned i = 0; i < 7; ++i)
+        CHECK(lv_image_src_get_type(lv_image_get_src(lv_obj_get_child(door.root, i))) == LV_IMAGE_SRC_FILE);
+    ov_door_destroy(&door);
+    for(unsigned cycle = 0; cycle < 10; ++cycle) {
+        CHECK(ov_door_create(&door, lv_screen_active()));
+        st.right_hand_drive = true;
+        ov_door_apply(&door, &st, false);
+        CHECK(lv_image_src_get_type(lv_image_get_src(door.hood)) == LV_IMAGE_SRC_VARIABLE);
+        ov_door_destroy(&door); /* 带存活镜像删除，再建不得复用悬空描述符 */
+        CHECK(door.root == NULL);
+    }
+    CHECK(ui_small_door_create(&small, lv_screen_active(), 0, 0,
+                               UI_IMG("Door/Style1/small_door_bg.png"),
+                               UI_IMG("Door/Style1/small_door_left_front.png"),
+                               UI_IMG("Door/Style1/small_door_right_front.png")));
+    check_mirror_pixels(lv_obj_get_child(small.root, 0), 0, 0, 64, 64);
+    ui_small_door_set_right_hand_drive(&small, true);
+    for(unsigned i = 0; i < 3; ++i)
+        CHECK(lv_image_src_get_type(lv_image_get_src(lv_obj_get_child(small.root, i))) ==
+              LV_IMAGE_SRC_VARIABLE);
+    lv_obj_delete(small.root);
+
+    ui_app_deinit();
+    CHECK(ui_app_init());
+    CHECK(ui_app_set_style("forester1"));
+    car_state_init(&st);
+    st.turn.valid = true;
+    st.turn.left = true;
+    page_push_view(&st);
+    lv_obj_t *page = ui_app_current_root();
+    lv_obj_update_layout(page);
+    lv_obj_t *stack = page_child(page, 553, 140, 814, 509);
+    lv_obj_t *clip = page_child(stack, 87, 95, 660, 340);
+    CHECK(clip != NULL);
+    check_mirror_pixels(lv_obj_get_child(clip, 8), 170, 330, 660, 340);
+    for(unsigned hand = 0; hand < 3; ++hand) {
+        st.right_hand_drive = hand == 1;
+        page_push_view(&st);
+        CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 10), LV_OBJ_FLAG_HIDDEN) == (hand == 1));
+        CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN) == (hand != 1));
+        for(unsigned i = 0; i < 12; ++i)
+            CHECK(lv_image_src_get_type(lv_image_get_src(lv_obj_get_child(clip, i))) ==
+                  (hand == 1 ? LV_IMAGE_SRC_VARIABLE : LV_IMAGE_SRC_FILE));
+        lv_obj_update_layout(page);
+        CHECK(page_child(page, 166, 79, 620, 620) != NULL);
+        CHECK(find_label_text(page, "ODO:") != NULL);
+    }
+    /* 仅改变配置，沿实际刷新入口重放缓存快照，不发送新车况。 */
+    car_settings_t settings;
+    car_settings_reset(&settings);
+    ui_app_settings_set_settings(&settings);
+    CHECK(car_settings_set_appearance(&settings, 0xFFFFFFU, true));
+    ui_app_settings_refresh();
+    CHECK(lv_image_src_get_type(lv_image_get_src(lv_obj_get_child(clip, 0))) == LV_IMAGE_SRC_VARIABLE);
+    CHECK(!lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN));
+    for(unsigned mode = 0; mode < 4; ++mode) {
+        st.turn.left = (mode & 1U) != 0;
+        st.turn.right = (mode & 2U) != 0;
+        page_push_view(&st);
+        CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 10), LV_OBJ_FLAG_HIDDEN) == !st.turn.right);
+        CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN) == !st.turn.left);
+    }
+    lv_tick_inc(500);
+    page_push_view(&st);
+    CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 10), LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN));
+    CHECK(car_settings_set_appearance(&settings, 0xFFFFFFU, false));
+    ui_app_settings_refresh();
+    CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 10), LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN));
+    lv_tick_inc(500);
+    page_push_view(&st);
+    CHECK(!lv_obj_has_flag(lv_obj_get_child(clip, 10), LV_OBJ_FLAG_HIDDEN));
+    CHECK(!lv_obj_has_flag(lv_obj_get_child(clip, 11), LV_OBJ_FLAG_HIDDEN));
+    CHECK(car_settings_set_appearance(&settings, 0xFFFFFFU, true));
+    ui_app_settings_refresh();
+    CHECK(ui_app_set_style("general1"));
+    CHECK(ui_app_set_style("forester1"));
+    page = ui_app_current_root();
+    lv_obj_update_layout(page);
+    stack = page_child(page, 553, 140, 814, 509);
+    clip = page_child(stack, 87, 95, 660, 340);
+    CHECK(lv_image_src_get_type(lv_image_get_src(lv_obj_get_child(clip, 0))) == LV_IMAGE_SRC_VARIABLE);
+    ui_app_settings_set_settings(NULL);
+    ui_app_deinit();
+}
+
 int main(void)
 {
     lv_init();
@@ -2057,6 +2371,7 @@ int main(void)
     test_tire(lv_screen_active());
     test_lamp_states(lv_screen_active());
     test_lamp_4h_gate(lv_screen_active());
+    test_lamp_auto_stop_gate(lv_screen_active());
     test_lamp_blink(lv_screen_active());
     test_cruise(lv_screen_active());
     test_assist_lamp_gates(lv_screen_active());
@@ -2064,6 +2379,7 @@ int main(void)
     test_speed_units(lv_screen_active());
     test_range_units(lv_screen_active());
     test_fuel_threshold(lv_screen_active());
+    test_fuel_port(lv_screen_active());
     test_short_term(lv_screen_active());
     test_tips_warn(lv_screen_active());
     test_warn_end_to_end(lv_screen_active());
@@ -2074,6 +2390,7 @@ int main(void)
     test_state_restore();
     test_style_cycles();
     test_app_lifecycle();
+    test_right_hand_drive();
     ui_app_deinit();
     lv_display_delete(display);
     lv_deinit();

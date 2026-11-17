@@ -120,8 +120,8 @@ bool speed_forester1_create(speed_forester1_t *speed, lv_obj_t *parent,
                    "SubaruForester/speed_bg1.png", &s_needle,
                    NEEDLE_X, NEEDLE_Y, NEEDLE_PIVOT_X, NEEDLE_PIVOT_Y, -1950);
 
-    speed->unit = ui_dial_add_text(&speed->dial, "km/h", 290, 350, UI_FONT_SM);
-    ui_dial_add_labels(&speed->dial, s_labels, SPEED_F1_LABEL_COUNT, UI_FONT_MD,
+    speed->unit = ui_dial_add_text(&speed->dial, "km/h", 290, 350, UI_TEXT(20));
+    ui_dial_add_labels(&speed->dial, s_labels, SPEED_F1_LABEL_COUNT, UI_KONEXY(24),
                        speed->labels, SPEED_F1_LABEL_COUNT);
 
     return true;
@@ -154,10 +154,13 @@ void speed_forester1_apply(speed_forester1_t *speed, uint32_t speed_kph,
     for(size_t i = 0; i < SPEED_F1_LABEL_COUNT; i++) {
         const char *text = mile ? s_labels_mile[i] : s_labels[i].text;
 
-        lv_obj_set_style_text_font(speed->labels[i],
-                                   (int32_t)i == target ? UI_FONT_LG : UI_FONT_MD,
-                                   0);
         lv_label_set_text(speed->labels[i], text);
+        /* QML scales the 24px glyph around its centre. Keep the hit intervals
+         * and all angle calculations unchanged. */
+        lv_obj_set_style_transform_pivot_x(speed->labels[i], LV_PCT(50), 0);
+        lv_obj_set_style_transform_pivot_y(speed->labels[i], LV_PCT(50), 0);
+        lv_obj_set_style_transform_scale(speed->labels[i],
+                                         (int32_t)i == target ? 307 : 256, 0);
     }
 
     lv_label_set_text(speed->unit, mile ? "mph" : "km/h");

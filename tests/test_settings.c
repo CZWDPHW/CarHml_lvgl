@@ -5,6 +5,8 @@
  *       ACC 首次采样不触发、下降沿触发、重复关闭帧不重复写、
  *       保存期间的新修改不丢、无 dirty 不写、退出补存。
  */
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,6 +83,9 @@ static void test_defaults(void)
     /* Qt radaronoff 实为“雷达开启”，缺省 true；show4h 缺省 false */
     CHECK(settings.values.radar_on == 1U);
     CHECK(settings.values.show_4h == 0U);
+    CHECK(settings.values.animation_style == 0U);
+    CHECK(!car_settings_set_animation_style(&settings, 2U));
+    CHECK(!car_settings_set_animation_style(&settings, 0U));
     CHECK(!car_settings_dirty(&settings));
 }
 
@@ -254,6 +259,11 @@ static void test_save_and_reload(void)
     CHECK(car_settings_set_eco_or_fuel(&settings, false));
     CHECK(car_settings_set_radar_on(&settings, false));
     CHECK(car_settings_set_show_4h(&settings, true));
+    CHECK(car_settings_set_animation_style(&settings, 1U));
+    CHECK(car_settings_set_connect(&settings, true, 2U));
+    CHECK(!car_settings_set_connect(&settings, true, 2U));
+    CHECK(!car_settings_set_connect(&settings, false, 3U));
+    CHECK(car_settings_set_appearance(&settings, 0xabcdefU, true));
 
     version = car_settings_snapshot(&settings, &snapshot);
     CHECK(version == settings.version);
@@ -290,6 +300,11 @@ static void test_save_and_reload(void)
     CHECK(reloaded.values.eco_or_fuel == 0U);
     CHECK(reloaded.values.radar_on == 0U);
     CHECK(reloaded.values.show_4h == 1U);
+    CHECK(reloaded.values.animation_style == 1U);
+    CHECK(reloaded.values.connect_enabled == 1U);
+    CHECK(reloaded.values.connect_mode == 2U);
+    CHECK(reloaded.values.car_color_rgb == 0xabcdefU);
+    CHECK(reloaded.values.right_hand_drive == 1U);
     CHECK(!car_settings_dirty(&reloaded));
 
     (void)unlink(path);
@@ -340,8 +355,8 @@ static void test_save_failure_keeps_dirty(void)
     uint64_t version;
 
     make_path(good, sizeof(good), "setting.cfg");
-    (void)snprintf(ro_dir, sizeof(ro_dir), "%s/ro_dir", s_dir);
-    (void)snprintf(missing, sizeof(missing), "%s/setting.cfg", ro_dir);
+    make_path(ro_dir, sizeof(ro_dir), "ro_dir");
+    make_path(missing, sizeof(missing), "ro_dir/setting.cfg");
     (void)unlink(missing);
     (void)rmdir(ro_dir);
     if(mkdir(ro_dir, 0555) != 0) {
@@ -352,9 +367,10 @@ static void test_save_failure_keeps_dirty(void)
     CHECK(car_settings_load(&settings, good));
     CHECK(car_settings_set_dark_mode(&settings, 1U));
     version = car_settings_snapshot(&settings, &snapshot);
-    (void)snprintf(snapshot.path, sizeof(snapshot.path), "%s", missing);
-    (void)snprintf(snapshot.tmp_path, sizeof(snapshot.tmp_path), "%s.tmp",
-                   missing);
+    snapshot.path[0] = '\0';
+    snapshot.tmp_path[0] = '\0';
+    (void)strncat(snapshot.path, good, sizeof(snapshot.path) - 1U);
+    (void)strncat(snapshot.tmp_path, missing, sizeof(snapshot.tmp_path) - 1U);
     /* root 用户无视目录权限，此时跳过“写失败”这一断言 */
     if(access(ro_dir, W_OK) != 0) {
         CHECK(!car_settings_save(&snapshot, version, &settings));
@@ -462,8 +478,8 @@ static void test_save_creates_missing_dir(void)
     char dir[200];
 
     /* 目标目录不存在（首次启动 /opt/car_dashboard 未创建）时应自动建目录 */
-    (void)snprintf(dir, sizeof(dir), "%s/newdir", s_dir);
-    (void)snprintf(path, sizeof(path), "%s/setting.cfg", dir);
+    make_path(dir, sizeof(dir), "newdir");
+    make_path(path, sizeof(path), "newdir/setting.cfg");
     (void)rmdir(dir);
     (void)unlink(path);
 
@@ -558,6 +574,71 @@ static void test_eco_history(void)
     (void)unlink(path);
 }
 
+static void test_connect_persistence(void)
+{
+    car_settings_t settings, snapshot, loaded;
+    char path[200];
+    make_path(path, sizeof(path), "setting.cfg");
+    (void)unlink(path);
+    car_settings_reset(&settings);
+    CHECK(car_settings_load(&settings, path));
+    CHECK(settings.values.connect_enabled == 0U);
+    CHECK(settings.values.connect_mode == 0U);
+    car_settings_set_notify(&settings, on_changed, NULL);
+    g_notify_calls = 0;
+    CHECK(car_settings_set_connect(&settings, true, 2U));
+    CHECK(g_notify_calls == 1 && g_notify_mask == CAR_SETTINGS_CHANGED_CONNECT);
+    uint64_t version = car_settings_snapshot(&settings, &snapshot);
+    CHECK(!car_settings_set_connect(&settings, false, 3U));
+    CHECK(settings.version == version && settings.values.connect_enabled == 1U);
+    CHECK(g_notify_calls == 1);
+    CHECK(car_settings_set_connect(&settings, false, 2U));
+    CHECK(car_settings_save(&snapshot, version, &settings));
+    CHECK(car_settings_dirty(&settings));
+    version = car_settings_snapshot(&settings, &snapshot);
+    CHECK(car_settings_save(&snapshot, version, &settings));
+    car_settings_reset(&loaded);
+    CHECK(car_settings_load(&loaded, path));
+    CHECK(loaded.values.connect_enabled == 0U && loaded.values.connect_mode == 2U);
+    CHECK(!car_settings_dirty(&loaded));
+    FILE *fp = fopen(path, "w");
+    CHECK(fp != NULL);
+    if(fp != NULL) {
+        fputs("[settings]\nconnect_enabled=2\nconnect_mode=3\n", fp);
+        fclose(fp);
+        car_settings_reset(&loaded);
+        CHECK(car_settings_load(&loaded, path));
+        CHECK(loaded.values.connect_enabled == 0U && loaded.values.connect_mode == 0U);
+        CHECK(!car_settings_dirty(&loaded));
+    }
+    (void)unlink(path);
+}
+
+static void test_language_factory_persistence(void)
+{
+    car_settings_t settings, snapshot, loaded;
+    char path[200];
+    make_path(path, sizeof(path), "setting.cfg");
+    car_settings_reset(&settings);
+    CHECK(car_settings_load(&settings, path));
+    CHECK(car_settings_set_language(&settings, 0));
+    for(unsigned i = 2; i < 19; ++i) CHECK(!car_settings_set_language(&settings, i));
+    CHECK(settings.values.language == 0);
+    CHECK(!car_settings_set_factory(&settings, 0x800, true, true, false, 57));
+    CHECK(!car_settings_set_factory(&settings, 1, true, true, false, 60));
+    CHECK(car_settings_set_factory(&settings, 0x555, false, false, true, 69));
+    uint64_t version = car_settings_snapshot(&settings, &snapshot);
+    CHECK(car_settings_save(&snapshot, version, &settings));
+    car_settings_reset(&loaded);
+    CHECK(car_settings_load(&loaded, path));
+    CHECK(loaded.values.language == 0 && loaded.values.factory_features == 0x555);
+    CHECK(!loaded.values.tire_on && !loaded.values.door_on);
+    CHECK(loaded.values.fuel_filler_right && loaded.values.fuel_tank == 69);
+    CHECK(!car_settings_dirty(&loaded));
+    CHECK(car_settings_set_language(&loaded, 1));
+    (void)unlink(path);
+}
+
 int main(void)
 {
     (void)snprintf(s_dir, sizeof(s_dir), "/tmp/carmw_settings_test_XXXXXX");
@@ -577,6 +658,8 @@ int main(void)
     test_saver_first_acc_off();
     test_save_creates_missing_dir();
     test_eco_history();
+    test_connect_persistence();
+    test_language_factory_persistence();
 
     remove_dir_files();
     (void)rmdir(s_dir);

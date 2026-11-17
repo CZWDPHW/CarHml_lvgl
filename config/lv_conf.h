@@ -32,6 +32,8 @@
 #define LV_FS_STDIO_CACHE_SIZE 0
 
 /* ---------------- 字体 ---------------- */
+/* ui_settings_cjk uses compressed glyph bitmaps. */
+#define LV_USE_FONT_COMPRESSED 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_18 1

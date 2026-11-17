@@ -24,6 +24,15 @@
 #define LV_USE_DRAW_SW 1
 #define LV_DRAW_SW_DRAW_UNIT_CNT 1
 #define LV_DRAW_LAYER_SIMPLE_BUF_SIZE (16 * 1024)
+#if defined(__aarch64__) || defined(__ARM_NEON)
+#define LV_USE_DRAW_SW_ASM LV_DRAW_SW_ASM_NEON
+#else
+#define LV_USE_DRAW_SW_ASM LV_DRAW_SW_ASM_NONE
+#endif
+
+/* ---------------- 图片缓存 ---------------- */
+#define LV_CACHE_DEF_SIZE (16 * 1024 * 1024)
+#define LV_IMAGE_HEADER_CACHE_DEF_CNT 64
 
 /* ---------------- 日志 ---------------- */
 #define LV_USE_LOG 1
@@ -41,9 +50,11 @@
 #define LV_USE_LODEPNG 1
 #define LV_FS_STDIO_LETTER 'A'
 #define LV_FS_STDIO_PATH "./assets"
-#define LV_FS_STDIO_CACHE_SIZE 0
+#define LV_FS_STDIO_CACHE_SIZE 8192
 
 /* ---------------- 字体 ---------------- */
+/* ui_settings_cjk uses compressed glyph bitmaps. */
+#define LV_USE_FONT_COMPRESSED 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_18 1
 #define LV_FONT_MONTSERRAT_20 1
@@ -61,7 +72,7 @@
 #define LV_LINUX_FBDEV_BSD 0
 #define LV_LINUX_FBDEV_RENDER_MODE LV_DISPLAY_RENDER_MODE_PARTIAL
 #define LV_LINUX_FBDEV_BUFFER_COUNT 1
-#define LV_LINUX_FBDEV_BUFFER_SIZE 60
+#define LV_LINUX_FBDEV_BUFFER_SIZE 360
 #define LV_LINUX_FBDEV_MMAP 1
 #define LV_USE_EVDEV 0
 

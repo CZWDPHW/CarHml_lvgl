@@ -71,15 +71,15 @@ static void rows_create(itinerary_card_t *card, lv_obj_t *content)
     (void)ui_info_row_create(&card->row_time,
                              column, UI_IMG("material2/MenuItem/clock.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
-                             &lv_font_montserrat_28);
+                             UI_GEELY(27));
     (void)ui_info_row_create(&card->row_distance,
                              column, UI_IMG("material2/MenuItem/kilometer.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
-                             &lv_font_montserrat_28);
+                             UI_GEELY(27));
     (void)ui_info_row_create(&card->row_speed,
                              column, UI_IMG("material2/MenuItem/gauge.png"),
                              ROW_ICON_W, ROW_ICON_H, ROW_ICON_GAP,
-                             &lv_font_montserrat_28);
+                             UI_GEELY(27));
 
     /* 三行竖排，行间距 ROW_GAP */
     lv_obj_set_size(column, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
@@ -111,7 +111,7 @@ bool itinerary_card_create(itinerary_card_t *card, lv_obj_t *parent)
     /* 标题 + 内容区直接建在 root 内，不再套一层卡片 */
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       CARD_TITLE_H, "ITINERARY",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
     rows_create(card, content);
 
     return true;

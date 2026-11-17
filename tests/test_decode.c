@@ -499,6 +499,72 @@ void test_decode_suite(void)
         CHECK(st.driver_assist.valid);
     }
 
+    /* ---- 0x86 电动助力转向回读：index 9，status 1 运动 / 0 常规 ---- */
+    {
+        const uint8_t sport[3] = {0x86U, 0x49U, 0x00U};
+        const uint8_t normal[3] = {0x86U, 0x09U, 0x00U};
+
+        car_state_init(&st);
+        CHECK(st.driver_assist.steering_mode == 0U); /* Qt 缺省常规 */
+        CHECK(car_decode_high_func(sport, 3, &st));
+        CHECK(st.driver_assist.steering_mode == 1U);
+        CHECK(st.driver_assist.valid);
+        CHECK(car_decode_high_func(normal, 3, &st));
+        CHECK(st.driver_assist.steering_mode == 0U);
+    }
+
+    /* ---- 0x86 驻车辅助/底盘控制回读：开关与 3 档选项 ---- */
+    {
+        const uint8_t moving_off[3] = {0x86U, 0x04U, 0x00U};  /* index 4 关 */
+        const uint8_t front_off[3] = {0x86U, 0x05U, 0x00U};   /* index 5 关 */
+        const uint8_t rear_off[3] = {0x86U, 0x06U, 0x00U};    /* index 6 关 */
+        const uint8_t display_off[3] = {0x86U, 0x07U, 0x00U}; /* index 7 关 */
+        const uint8_t trace_off[3] = {0x86U, 0x08U, 0x00U};   /* index 8 关 */
+        const uint8_t volume[3] = {0x86U, 0x51U, 0x00U};      /* index 17 = 1 */
+        const uint8_t distance[3] = {0x86U, 0x92U, 0x00U};    /* index 18 = 2 */
+        const uint8_t brake_off[3] = {0x86U, 0x13U, 0x00U};   /* index 19 关 */
+        const uint8_t cross_off[3] = {0x86U, 0x1AU, 0x00U};   /* index 26 关 */
+        const uint8_t sensor[3] = {0x86U, 0x9BU, 0x00U};      /* index 27 = 2 */
+
+        car_state_init(&st);
+        CHECK(!st.parking_chassis.valid);
+        CHECK(st.parking_chassis.moving_object); /* Qt 缺省 true */
+        CHECK(st.parking_chassis.rear_cross_traffic);
+        CHECK(st.parking_chassis.active_trace_control);
+        CHECK(st.parking_chassis.radar_volume == 0U);
+
+        CHECK(car_decode_high_func(moving_off, 3, &st));
+        CHECK(st.parking_chassis.valid);
+        CHECK(!st.parking_chassis.moving_object);
+
+        CHECK(car_decode_high_func(front_off, 3, &st));
+        CHECK(!st.parking_chassis.front_radar);
+
+        CHECK(car_decode_high_func(rear_off, 3, &st));
+        CHECK(!st.parking_chassis.rear_radar);
+
+        CHECK(car_decode_high_func(display_off, 3, &st));
+        CHECK(!st.parking_chassis.radar_display);
+
+        CHECK(car_decode_high_func(trace_off, 3, &st));
+        CHECK(!st.parking_chassis.active_trace_control);
+
+        CHECK(car_decode_high_func(volume, 3, &st));
+        CHECK(st.parking_chassis.radar_volume == 1U);
+
+        CHECK(car_decode_high_func(distance, 3, &st));
+        CHECK(st.parking_chassis.radar_distance == 2U);
+
+        CHECK(car_decode_high_func(brake_off, 3, &st));
+        CHECK(!st.parking_chassis.active_engine_brake);
+
+        CHECK(car_decode_high_func(cross_off, 3, &st));
+        CHECK(!st.parking_chassis.rear_cross_traffic);
+
+        CHECK(car_decode_high_func(sensor, 3, &st));
+        CHECK(st.parking_chassis.parking_sensor == 2U);
+    }
+
     /* ---- 0x86 车辆设置回读：开关与选项 ---- */
     {
         const uint8_t welcome_on[3] = {0x86U, 0x4AU, 0x00U};   /* index 10 开 */

@@ -281,7 +281,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     }
     {
         lv_obj_t *label = tips_label(ov->fuel_banner, "LOW FUEL!",
-                                     &lv_font_montserrat_24, TIPS_YELLOW);
+                                     UI_TEXT(24), TIPS_YELLOW);
         lv_obj_align(label, LV_ALIGN_LEFT_MID, 64, 0);
     }
 
@@ -301,7 +301,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
         }
         {
             lv_obj_t *label = tips_label(ov->gear_banner, s_gear_text,
-                                         &lv_font_montserrat_24, TIPS_YELLOW);
+                                         UI_TEXT(24), TIPS_YELLOW);
             lv_obj_align(label, LV_ALIGN_LEFT_MID, 64, 0);
 
             /* 宽度 = 10 + 42 + 12 + 文字宽，x = (1920 - 宽) / 2 - 20 */
@@ -339,7 +339,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     lv_obj_set_pos(ov->gen_title_icon, GEN_PAD + 20, GEN_TITLE_Y);
 
     ov->gen_title = tips_label(ov->general, "WARNING",
-                               &lv_font_montserrat_22, UI_COLOR_WHITE);
+                               UI_TEXT(22), UI_COLOR_WHITE);
     lv_obj_set_pos(ov->gen_title, GEN_PAD + 60, GEN_TITLE_Y + 2);
 
     /* 1px 白色 20% 分隔线 */
@@ -356,7 +356,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     ov->gen_icon = lv_image_create(ov->general);
     lv_obj_set_pos(ov->gen_icon, 80, GEN_MID_Y + GEN_ICON_Y);
 
-    ov->gen_text = tips_label(ov->general, "", &lv_font_montserrat_18,
+    ov->gen_text = tips_label(ov->general, "", UI_TEXT(18),
                               UI_COLOR_WHITE);
     lv_obj_set_pos(ov->gen_text, GEN_PAD + 10, GEN_MID_Y + GEN_TEXT_Y);
     lv_obj_set_width(ov->gen_text, GEN_W - GEN_PAD * 2 - 20);
@@ -364,7 +364,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
     lv_obj_set_style_text_align(ov->gen_text, LV_TEXT_ALIGN_CENTER, 0);
 
     /* 正文隐藏时显示的红字，Qt 为 24px 粗体 #FF4444 居中 */
-    ov->gen_aux = tips_label(ov->general, "FAULT", &lv_font_montserrat_24,
+    ov->gen_aux = tips_label(ov->general, "FAULT", UI_TEXT(24),
                              0xFF4444);
     lv_obj_set_width(ov->gen_aux, GEN_W - GEN_PAD * 2);
     lv_obj_set_pos(ov->gen_aux, GEN_PAD, GEN_AUX_Y);
@@ -373,7 +373,7 @@ bool ov_tips_create(ov_tips_t *ov, lv_obj_t *parent)
 
     {
         lv_obj_t *bottom = tips_label(ov->general, "SEE USER MANUAL",
-                                      &lv_font_montserrat_14, TIPS_GRAY);
+                                      UI_TEXT(14), TIPS_GRAY);
         lv_obj_set_width(bottom, GEN_W - GEN_PAD * 2);
         lv_obj_set_pos(bottom, GEN_PAD, GEN_BOTTOM_Y);
         lv_obj_set_style_text_align(bottom, LV_TEXT_ALIGN_CENTER, 0);

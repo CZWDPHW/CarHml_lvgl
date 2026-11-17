@@ -61,13 +61,13 @@ static lv_obj_t *row_create(lv_obj_t *column, const char *name)
 
     name_label = lv_label_create(row);
     lv_label_set_text(name_label, name);
-    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(name_label, UI_TEXT_BOLD(27), 0);
     lv_obj_set_style_text_color(name_label, lv_color_white(), 0);
     lv_obj_set_style_pad_bottom(name_label, 4, 0);   /* 视觉居中 */
 
     value = lv_label_create(row);
     lv_label_set_text(value, "---");
-    lv_obj_set_style_text_font(value, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(value, UI_GEELY(27), 0);
     lv_obj_set_style_text_color(value, lv_color_white(), 0);
     lv_obj_set_style_pad_bottom(value, 2, 0);        /* bottomMargin 2 */
 
@@ -93,7 +93,7 @@ bool short_term_card_create(short_term_card_t *card, lv_obj_t *parent)
     /* 标题区 150 高，标题居中（中文受限，用英文） */
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       TITLE_H, "SHORT TERM",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
 
     body = ui_blank_container(content);
     lv_obj_set_size(body, BODY_W, BODY_H);
@@ -119,7 +119,7 @@ bool short_term_card_create(short_term_card_t *card, lv_obj_t *parent)
     /* 油耗单位：18 号，紧跟在数值后、下边距 4 */
     card->fuel_unit = lv_label_create(lv_obj_get_parent(card->value[3]));
     lv_label_set_text(card->fuel_unit, "L/100km");
-    lv_obj_set_style_text_font(card->fuel_unit, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(card->fuel_unit, UI_GEELY(18), 0);
     lv_obj_set_style_text_color(card->fuel_unit, lv_color_white(), 0);
     lv_obj_set_style_pad_left(card->fuel_unit, 6, 0);    /* leftMargin 6 */
     lv_obj_set_style_pad_bottom(card->fuel_unit, 4, 0);  /* bottomMargin 4 */

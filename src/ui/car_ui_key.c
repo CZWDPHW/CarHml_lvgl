@@ -2,7 +2,7 @@
  * car_ui_key.c - 方向盘按键（0x20）到界面动作的映射
  *
  * 见 car_ui_key.h 的语义说明。按键解码与队列都在 car_link，本文件只做
- * “键值 -> 界面动作”的翻译，保证与 Qt 端 handleSteeringKey 一致。
+ * “键值 -> 界面动作”的翻译
  *
  * 设置页打开且可见时（Qt settingsPageOpen && speed < 5）：
  *   23 交给设置页，19/20/21/22/26 交给设置页，13 返回上级，

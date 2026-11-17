@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 typedef struct {
-    void *ctx;
+    void *ctx;// 上下文指针
 
     /* 打开失败返回 false，中间件会退化为"只读缓存 + 模拟数据"模式 */
     bool (*open)(void *ctx);

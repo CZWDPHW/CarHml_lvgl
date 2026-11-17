@@ -5,7 +5,7 @@
  * 与车速表的差异：
  *   - 指针角度随转速递减（180° 起）
  *   - 高亮判据是左开右闭区间，(800, 1200]、(1800, 2200] ……
- *   - "0" 刻度常驻大字号，其余刻度仅在命中时放大
+ *   - "0" 在低转速时为48px，其余时间44px；其它刻度命中时放大
  */
 #ifndef CARMW_UI_ROTATE_FORESTER1_H
 #define CARMW_UI_ROTATE_FORESTER1_H
@@ -23,9 +23,10 @@ extern "C" {
 
 typedef struct {
     ui_dial_t dial;                            /* 表盘及指针动画目标 */
-    lv_obj_t *zero;                            /* "0" 刻度，始终大字号 */
+    lv_obj_t *zero;                            /* "0" 刻度 */
     lv_obj_t *labels[ROTATE_F1_LABEL_COUNT];   /* 1~8 刻度文本 */
     int32_t highlight;                         /* 当前放大的刻度序号，-1 表示无 */
+    bool zero_large;                          /* Qt: rpm <= 200 uses 48px, otherwise 44px. */
 } rotate_forester1_t;
 
 /*

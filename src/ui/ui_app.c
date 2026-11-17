@@ -12,6 +12,7 @@
 #include "carmw/car_settings.h"
 #include "ui/settings/ui_settings_page.h"
 #include "ui/ui_common.h"
+#include "ui/ui_i18n.h"
 #include "ui/ui_session.h"
 
 /* 设置页无按键自动关闭（Qt settingTimerOut 8000ms） */
@@ -20,7 +21,7 @@
 /* 车速低于该值才允许打开设置（Qt speed < 5） */
 #define SETTINGS_SPEED_LIMIT 5U
 
-static lv_obj_t *s_stage;
+static lv_obj_t *s_stage;// 舞台容器
 static ui_node_t *s_node;
 static const ui_style_desc_t *s_desc;
 static car_state_view_t s_last_view;
@@ -36,6 +37,9 @@ static ui_app_pending_cb_t s_pending_cb;
 static ui_app_settings_cmd_cb_t s_cmd_cb;
 /* 互联会话标志：无 ZLink SDK 时由演示“已连接”或 6.6 回调置位 */
 static bool s_carplay_active;
+/* 仪表本体语言：0=简体中文，其它=英文；首次 apply 时同步 */
+static bool s_i18n_ready;
+static bool s_i18n_chinese;
 
 static bool settings_speed_ok(void)
 {
@@ -53,7 +57,6 @@ static void settings_sync(void)
     }
 
     ui_settings_page_set_active(&s_settings_page, visible);
-    ui_settings_page_apply(&s_settings_page);
 }
 
 /* 设置是否还有改动没落盘：显示“改动待保存”提示（ACC 关闭时统一写入） */
@@ -70,33 +73,59 @@ static void settings_tick_restart(void)
 }
 
 /*
+ * 仪表本体中文化：页面 apply 会重写动态标签，中文模式下每帧补一次翻译。
+ * 语言变化（或 force）时先更新全局语言，切回英文时恢复原文与字体。
+ */
+static void i18n_sync(bool force)
+{
+    bool chinese = (s_settings_store != NULL) &&
+                   (s_settings_store->values.language == 0U);
+
+    if(!force && s_i18n_ready && chinese == s_i18n_chinese) {
+        if(chinese && s_node != NULL) {
+            ui_i18n_apply(s_node->root);
+        }
+        return;
+    }
+
+    s_i18n_ready = true;
+    s_i18n_chinese = chinese;
+    ui_i18n_set_language(chinese);
+
+    if(s_node != NULL) {
+        ui_i18n_apply(s_node->root);
+    }
+}
+
+/*
  * 创建全屏舞台容器，并给屏幕铺黑底；
  * 同时创建设置覆盖层（位于舞台最上层，默认隐藏）。
  */
 bool ui_app_init(void)
 {
-    lv_obj_t *scr;
+    lv_obj_t *scr;// 当前屏幕对象
 
-    if(s_stage != NULL) {
+    if(s_stage != NULL) {// 已初始化舞台容器
         return true;
     }
 
-    scr = lv_screen_active();
-    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    scr = lv_screen_active();// 获取当前屏幕对象
+    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);// 设置屏幕背景颜色为黑色
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);// 设置屏幕背景透明度为完全不透明
 
-    s_stage = lv_obj_create(scr);
-    lv_obj_remove_style_all(s_stage);
-    lv_obj_remove_flag(s_stage, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(s_stage, lv_pct(100), lv_pct(100));
-    lv_obj_set_pos(s_stage, 0, 0);
-    lv_obj_set_style_bg_color(s_stage, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(s_stage, LV_OPA_COVER, 0);
+    s_stage = lv_obj_create(scr);// 创建舞台容器
+    lv_obj_remove_style_all(s_stage);// 移除所有样式
+    lv_obj_remove_flag(s_stage, LV_OBJ_FLAG_SCROLLABLE);// 移除滚动标志
+    lv_obj_set_size(s_stage, lv_pct(100), lv_pct(100));// 设置舞台容器大小为 100%
+    lv_obj_set_pos(s_stage, 0, 0);// 设置舞台容器位置为 (0, 0)
+    lv_obj_set_style_bg_color(s_stage, lv_color_black(), 0);// 设置舞台容器背景颜色为黑色
+    lv_obj_set_style_bg_opa(s_stage, LV_OPA_COVER, 0);// 设置舞台容器背景透明度为完全覆盖
 
-    ui_session_reset();
-    ui_settings_state_init(&s_settings_page.st);
-    if(!ui_settings_page_create(&s_settings_page, s_stage)) {
-        lv_obj_delete(s_stage);
+    ui_session_reset();// 重置会话状态
+    ui_settings_state_init(&s_settings_page.st);// 初始化设置菜单状态
+    s_settings_open = false;// 设置菜单默认关闭
+    if(!ui_settings_page_create(&s_settings_page, s_stage)) {// 创建设置菜单
+        lv_obj_delete(s_stage);// 删除舞台容器
         s_stage = NULL;
         return false;
     }
@@ -131,6 +160,7 @@ void ui_app_deinit(void)
 
     s_desc = NULL;
     s_has_view = false;
+    s_i18n_ready = false;
     ui_session_reset();
 }
 
@@ -183,6 +213,8 @@ bool ui_app_set_style(const char *id)
     if(s_has_view && s_node->vt->apply != NULL) {
         s_node->vt->apply(s_node, &s_last_view);
     }
+
+    i18n_sync(true);
 
     if(s_settings_page.root != NULL) {
         lv_obj_move_foreground(s_settings_page.root);
@@ -336,8 +368,19 @@ static void settings_override_units(void)
     s_last_view.state.daylight = s_settings_store->values.daylight;
     s_last_view.state.nightlight = s_settings_store->values.nightlight;
     /* 雷达与四驱可见性是本地偏好，不是 MCU 实时状态 */
+    s_last_view.state.right_hand_drive = s_settings_store->values.right_hand_drive != 0U;
     s_last_view.state.radar_on = s_settings_store->values.radar_on != 0U;
+    s_last_view.state.factory_hide_tire = !s_settings_store->values.tire_on;
+    s_last_view.state.factory_hide_door = !s_settings_store->values.door_on;
     s_last_view.state.show_4h = s_settings_store->values.show_4h != 0U;
+    /* Qt enableAutoStop：工厂功能位 bit10，控制森林人底部自动启停灯位可见性 */
+    s_last_view.state.factory_auto_stop =
+        (s_settings_store->values.factory_features & (1U << 10)) != 0U;
+    uint32_t rgb = s_settings_store->values.car_color_rgb;
+    s_last_view.state.car_color.red = (uint8_t)(rgb >> 16);
+    s_last_view.state.car_color.green = (uint8_t)(rgb >> 8);
+    s_last_view.state.car_color.blue = (uint8_t)rgb;
+    s_last_view.state.car_color.valid = true;
 }
 
 /* 缓存最新快照后再转发，保证样式切换后能立即补一次状态 */
@@ -365,16 +408,25 @@ void ui_app_apply(const car_state_view_t *view)
         s_last_view.state.driver_assist.emergency_braking,
         s_last_view.state.driver_assist.lane_departure_warning,
         s_last_view.state.driver_assist.blind_spot_warning);
+    /* 电动助力转向只显示 MCU 回读值（0x16 index 9） */
+    ui_settings_page_set_steering_mode(
+        &s_settings_page, s_last_view.state.driver_assist.steering_mode);
+    /* 驻车辅助/底盘控制只显示 MCU 回读值（0x16 index 4~8/17~19/26/27） */
+    ui_settings_page_set_parking_chassis(
+        &s_settings_page, &s_last_view.state.parking_chassis);
+    s_settings_page.factory_models = view->state.car_model;
+    ui_settings_page_set_date(&s_settings_page, &view->state.clock, &view->state.units,
+                              view->state.sys_setting.valid
+                                  ? view->state.sys_setting.time_source : 0U);
     ui_settings_page_set_speed_warning(
         &s_settings_page, s_last_view.state.speed_warning.valid,
         s_last_view.state.speed_warning.speed_kph);
     /* 车辆设置项同样只显示 MCU 0x16 回读值 */
-    ui_settings_page_set_vehicle_settings(
-        &s_settings_page,
-        s_last_view.state.vehicle_setting.welcome_light,
-        s_last_view.state.vehicle_setting.auto_interior_light,
-        s_last_view.state.vehicle_setting.horn_feedback,
-        s_last_view.state.vehicle_setting.auto_door_unlock);
+    ui_settings_page_set_vehicle_settings(&s_settings_page,
+                                          &s_last_view.state.vehicle_setting);
+    /* 保养公里数按项目注入（0x36 Status 回读） */
+    ui_settings_page_set_service(&s_settings_page,
+                                 &s_last_view.state.maintenance);
     ui_settings_page_set_version(
         &s_settings_page, s_last_view.state.version.main,
         s_last_view.state.version.main_valid, s_last_view.state.version.chip,
@@ -390,6 +442,8 @@ void ui_app_apply(const car_state_view_t *view)
         s_node->vt->apply(s_node, &s_last_view);
     }
 
+    i18n_sync(false);
+
     /* 车速超过门限时 Qt 直接隐藏设置页（settingsPageOpen 不清除） */
     settings_sync();
     settings_pending_sync();
@@ -401,7 +455,7 @@ void ui_app_apply(const car_state_view_t *view)
     }
 }
 
-/* 按键事件：设置页可见时优先消费，其余转发给样式 */
+/* 按键事件：设置页 → 样式，逐级下发 */
 void ui_app_handle_key(const ui_key_event_t *evt)
 {
     if(evt == NULL) {
@@ -475,7 +529,6 @@ void ui_app_settings_open(void)
     ui_settings_state_init(&s_settings_page.st);
     /* 调用方已校验车速（Qt：speed < 5），这里不受快照门控影响 */
     ui_settings_page_set_active(&s_settings_page, true);
-    ui_settings_page_apply(&s_settings_page);
     settings_pending_sync();
 }
 
@@ -485,7 +538,6 @@ void ui_app_settings_close(void)
     s_settings_open = false;
     ui_settings_state_init(&s_settings_page.st);
     ui_settings_page_set_active(&s_settings_page, false);
-    ui_settings_page_apply(&s_settings_page);
 }
 
 /* 设置值变化后刷新显示：设置页 + 用缓存快照重刷样式，让单位/卡片立即生效 */
@@ -502,6 +554,8 @@ void ui_app_settings_refresh(void)
         settings_override_units();
         s_node->vt->apply(s_node, &s_last_view);
     }
+
+    i18n_sync(true);
 }
 
 uint32_t ui_app_center_card_mask(void)
@@ -535,7 +589,6 @@ void ui_app_settings_next_or_back(void)
 
     settings_tick_restart();
     ui_settings_page_next_or_back(&s_settings_page);
-    ui_settings_page_apply(&s_settings_page);
 }
 
 void ui_app_demo_media(uint8_t mode, const char *title,

@@ -414,7 +414,9 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
          * Qt QashqaiSet 设置项回读：
          *   len == 3 且 data[2] == 0 -> 压缩编码，index = data[1] & 0x3F，
          *   status = (data[1] >> 6) & 0x03，status == 1 表示开。
-         *   本工程保存 index 1~3 驾驶辅助，10/11/13/14/15/16/24/25/28 车辆设置。
+         *   本工程保存 index 1~3 驾驶辅助、9 电动助力转向，
+         *   4~8/17~19/26/27 驻车辅助与底盘控制，
+         *   10~16/20~25/28/29 车辆设置。
          *   len == 3 且 data[1] == 0 -> 扩展 ack，control 1 = 灯光关闭延时（32），
          *   control 2 = 点灯灵敏度（33）。
          *   其余按位图：data[1] bit0 紧急制动 / bit1 车道偏离 / bit2 变道盲区。
@@ -423,6 +425,7 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
             uint8_t index = (uint8_t)(data[1] & 0x3FU);
             uint8_t status = (uint8_t)((data[1] >> 6) & 0x03U);
             car_vehicle_setting_t *vs = &state->vehicle_setting;
+            car_parking_chassis_t *pc = &state->parking_chassis;
 
             if(index >= 1U && index <= 31U) {
                 bool on = (status == 1U);
@@ -440,12 +443,42 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
                     state->driver_assist.blind_spot_warning = on;
                     state->driver_assist.valid = true;
                     break;
+                case 4U:
+                    pc->moving_object = on;
+                    pc->valid = true;
+                    break;
+                case 5U:
+                    pc->front_radar = on;
+                    pc->valid = true;
+                    break;
+                case 6U:
+                    pc->rear_radar = on;
+                    pc->valid = true;
+                    break;
+                case 7U:
+                    pc->radar_display = on;
+                    pc->valid = true;
+                    break;
+                case 8U:
+                    pc->active_trace_control = on;
+                    pc->valid = true;
+                    break;
+                case 9U:
+                    /* 电动助力转向：status 为选项值，1 = 运动，其余常规 */
+                    state->driver_assist.steering_mode =
+                        (uint8_t)((status == 1U) ? 1U : 0U);
+                    state->driver_assist.valid = true;
+                    break;
                 case 10U:
                     vs->welcome_light = on;
                     vs->valid = true;
                     break;
                 case 11U:
                     vs->auto_interior_light = on;
+                    vs->valid = true;
+                    break;
+                case 12U:
+                    vs->lane_change_flash = on;
                     vs->valid = true;
                     break;
                 case 13U:
@@ -464,6 +497,34 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
                     vs->auto_door_unlock = (uint8_t)(status & 0x03U);
                     vs->valid = true;
                     break;
+                case 17U:
+                    pc->radar_volume = (uint8_t)(status & 0x03U);
+                    pc->valid = true;
+                    break;
+                case 18U:
+                    pc->radar_distance = (uint8_t)(status & 0x03U);
+                    pc->valid = true;
+                    break;
+                case 19U:
+                    pc->active_engine_brake = on;
+                    pc->valid = true;
+                    break;
+                case 20U:
+                    vs->rain_sensing_wipers = on;
+                    vs->valid = true;
+                    break;
+                case 21U:
+                    vs->rear_wiper_reverse_linkage = on;
+                    vs->valid = true;
+                    break;
+                case 22U:
+                    vs->wiper_mist_mode = on;
+                    vs->valid = true;
+                    break;
+                case 23U:
+                    vs->remote_engine_start = on;
+                    vs->valid = true;
+                    break;
                 case 24U:
                     vs->smart_door_unlock = on;
                     vs->valid = true;
@@ -472,8 +533,20 @@ bool car_decode_high_func(const uint8_t *data, uint16_t len, car_state_t *state)
                     vs->select_unlock = on;
                     vs->valid = true;
                     break;
+                case 26U:
+                    pc->rear_cross_traffic = on;
+                    pc->valid = true;
+                    break;
+                case 27U:
+                    pc->parking_sensor = (uint8_t)(status & 0x03U);
+                    pc->valid = true;
+                    break;
                 case 28U:
                     vs->auto_door_lock = (uint8_t)(status & 0x03U);
+                    vs->valid = true;
+                    break;
+                case 29U:
+                    vs->rain_sensor = on;
                     vs->valid = true;
                     break;
                 default:
@@ -741,6 +814,13 @@ bool car_decode_maintenance(const uint8_t *data, uint16_t len, car_state_t *stat
     state->maintenance.set_km = rd_u24(data + 1);
     state->maintenance.now_km = (int32_t)rd_u24(data + 4);
     state->maintenance.show_time = data[7];
+    if(state->maintenance.item < 3U) {
+        uint8_t item = state->maintenance.item;
+
+        state->maintenance.set_km_by_item[item] = state->maintenance.set_km;
+        state->maintenance.remain_km_by_item[item] = state->maintenance.now_km;
+        state->maintenance.item_valid[item] = true;
+    }
     state->maintenance.valid = true;
     return true;
 }

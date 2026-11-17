@@ -9,6 +9,7 @@
 #define CARMW_UI_THEME_H
 
 #include "lvgl.h"
+#include "ui/ui_fonts.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -21,12 +22,12 @@ extern "C" {
 #define UI_COLOR_GRAY   0x9A9A9A  /* 次级文字 */
 
 /* ---------- 字号 ---------- */
-#define UI_FONT_SM  (&lv_font_montserrat_20)
-#define UI_FONT_MD  (&lv_font_montserrat_24)
-#define UI_FONT_LG  (&lv_font_montserrat_28)
-#define UI_FONT_XL  (&lv_font_montserrat_36)
-#define UI_FONT_2XL (&lv_font_montserrat_44)
-#define UI_FONT_3XL (&lv_font_montserrat_48)
+#define UI_FONT_SM  UI_TEXT(20)
+#define UI_FONT_MD  UI_TEXT(24)
+#define UI_FONT_LG  UI_TEXT(28)
+#define UI_FONT_XL  UI_TEXT(36)
+#define UI_FONT_2XL UI_TEXT(44)
+#define UI_FONT_3XL UI_TEXT(48)
 
 /*
  * 全屏透明容器：去掉默认样式与滚动，尺寸铺满父对象。

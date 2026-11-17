@@ -73,41 +73,41 @@ typedef struct {
 } car_key_event_t;
 
 typedef struct {
-    car_port_t port;
-    car_parser_t parser;
-    car_session_t session;
-    car_state_store_t store;
+    car_port_t port;// 串口端口
+    car_parser_t parser;// 帧解析器
+    car_session_t session;// 手握话管理器
+    car_state_store_t store;// 状态存储器
 
     car_state_t pending;      /* 写者私有，攒够一次提交给 store */
-    uint64_t pending_mask;
+    uint64_t pending_mask;// 待处理状态掩码
 
-    car_cmd_t tx[CAR_LINK_TX_DEPTH];
-    uint8_t tx_head;
-    uint8_t tx_tail;
-    uint8_t tx_count;
+    car_cmd_t tx[CAR_LINK_TX_DEPTH];// 发送队列
+    uint8_t tx_head;// 发送队列头指针
+    uint8_t tx_tail;// 发送队列尾指针
+    uint8_t tx_count;// 发送队列当前元素数量
 
-    car_key_event_t keys[CAR_LINK_KEY_DEPTH];
-    uint8_t key_head;
-    uint8_t key_tail;
-    uint8_t key_count;
+    car_key_event_t keys[CAR_LINK_KEY_DEPTH];// 按键事件队列
+    uint8_t key_head;// 按键事件队列头指针
+    uint8_t key_tail;// 按键事件队列尾指针
+    uint8_t key_count;// 按键事件队列当前元素数量
 
-    car_trace_entry_t trace[CAR_LINK_TRACE_DEPTH];
-    uint8_t trace_head;
-    uint8_t trace_count;
+    car_trace_entry_t trace[CAR_LINK_TRACE_DEPTH];// 收帧记录队列
+    uint8_t trace_head;// 收帧记录队列头指针
+    uint8_t trace_count;// 收帧记录队列当前元素数量
 
-    car_link_stats_t stats;
-    car_lock_t lock;
-    uint64_t last_nack_ms;
-    bool nack_sent;
+    car_link_stats_t stats;// 统计信息
+    car_lock_t lock;// 保护队列和快照拷贝的锁
+    uint64_t last_nack_ms;// 上次 NACK 时间戳
+    bool nack_sent;// 是否已发送 NACK
 
-    bool running;
-    bool ack_enabled;
-    _Atomic bool stop_requested;
-    bool thread_started;
+    bool running;// 是否正在运行
+    bool ack_enabled;// 是否启用 ACK
+    _Atomic bool stop_requested;// 是否请求停止
+    bool thread_started;// 是否已启动线程
 #ifndef CARMW_NO_THREADS
-    pthread_t thread;
+    pthread_t thread;// 独立线程 ID
 #endif
-} car_link_t;
+} car_link_t;// 一条车载串口链路
 
 /*
  * 初始化并打开 port。open 失败不算致命错误：

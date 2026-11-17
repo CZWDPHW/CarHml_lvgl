@@ -37,10 +37,10 @@ static void *saver_thread(void *arg)
         bool ok = false;
 
         (void)pthread_mutex_lock(&saver->lock);
-        while(saver->requested_version == 0U && !saver->stop) {
+        while(saver->requested_version == 0U && !saver->stop_requested) {
             (void)pthread_cond_wait(&saver->cond, &saver->lock);
         }
-        stop = saver->stop;
+        stop = saver->stop_requested;
         target = saver->requested_version;
         if(target != 0U) {
             saver->requested_version = 0U;
@@ -137,6 +137,13 @@ static bool wait_done(car_settings_saver_t *saver, uint32_t timeout_ms)
     return saved;
 }
 
+/**
+ * @brief 启动本地设置保存器
+ * @param saver 本地设置保存器
+ * @param settings 本地设置
+ * @return true 成功
+ * @return false 失败
+ */
 bool car_settings_saver_start(car_settings_saver_t *saver,
                               car_settings_t *settings)
 {
@@ -153,7 +160,7 @@ bool car_settings_saver_start(car_settings_saver_t *saver,
     saver->seen = false;
     saver->last_on = false;
     saver->ever_on = false;
-    saver->stop = false;
+    saver->stop_requested = false;
     saver->started = false;
 
     if(pthread_mutex_init(&saver->lock, NULL) != 0) {
@@ -238,7 +245,7 @@ void car_settings_saver_stop(car_settings_saver_t *saver)
     request_current(saver);
 
     (void)pthread_mutex_lock(&saver->lock);
-    saver->stop = true;
+    saver->stop_requested = true;
     (void)pthread_cond_broadcast(&saver->cond);
     (void)pthread_mutex_unlock(&saver->lock);
 

@@ -19,6 +19,12 @@ if(CARMW_PLATFORM STREQUAL "BOARD" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "BOARD 平台使用 Linux framebuffer，目标系统必须是 Linux")
 endif()
 
+# Software rendering is too slow without optimization on the target CPU.
+# Keep explicit Debug/RelWithDebInfo choices; default an unspecified BOARD build.
+if(CARMW_PLATFORM STREQUAL "BOARD" AND NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
+
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(CARMW_WARN_FLAGS -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes)
 else()
@@ -43,7 +49,7 @@ add_library(carmw STATIC
     src/port/car_port_memory.c
 )
 
-target_include_directories(carmw PUBLIC include)
+target_include_directories(carmw PUBLIC include PRIVATE src)
 target_compile_options(carmw PRIVATE ${CARMW_WARN_FLAGS})
 
 # ---------------------------------------------------------------------------
@@ -51,7 +57,8 @@ target_compile_options(carmw PRIVATE ${CARMW_WARN_FLAGS})
 # ---------------------------------------------------------------------------
 if(UNIX)
     target_sources(carmw PRIVATE src/port/car_port_posix.c
-                                src/car_settings_saver.c)
+                                src/car_settings_saver.c
+                                src/car_log_cleanup.c)
     find_package(Threads REQUIRED)
     target_link_libraries(carmw PUBLIC Threads::Threads)
 endif()
@@ -86,6 +93,11 @@ if(CARMW_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     add_test(NAME carmw_settings COMMAND carmw_settings_tests)
 
     if(UNIX)
+        add_executable(carmw_log_cleanup_tests tests/test_log_cleanup.c)
+        target_link_libraries(carmw_log_cleanup_tests PRIVATE carmw)
+        target_compile_options(carmw_log_cleanup_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_log_cleanup COMMAND carmw_log_cleanup_tests)
+
         add_executable(carmw_demo examples/demo.c)
         target_link_libraries(carmw_demo PRIVATE carmw)
     endif()
@@ -126,10 +138,15 @@ if(CARMW_BUILD_UI)
         target_link_libraries(lvgl PUBLIC m)
     endif()
     
+    include(src/ui/fonts/fonts.cmake)
     add_library(carmw_ui STATIC
+        ${CARMW_QT_FONT_SOURCES}
+        src/ui/ui_fonts.c
         src/ui/ui_common.c
+        src/ui/ui_display.c
         src/ui/ui_assets.c
         src/ui/ui_app.c
+        src/ui/ui_i18n.c
         src/ui/car_ui_key.c
         src/ui/ui_session.c
         src/ui/ui_style_registry.c
@@ -169,6 +186,7 @@ if(CARMW_BUILD_UI)
         src/ui/overlays/ov_cruise.c
         src/ui/overlays/ov_tips.c
         src/ui/settings/ui_settings_page.c
+        src/ui/settings/ui_settings_language.c
     )
     target_include_directories(carmw_ui PUBLIC src)
     target_link_libraries(carmw_ui PUBLIC carmw lvgl::lvgl)
@@ -183,6 +201,30 @@ if(CARMW_BUILD_UI)
     endif()
 
     if(CARMW_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
+        add_executable(carmw_display_tests tests/test_display.c)
+        target_link_libraries(carmw_display_tests PRIVATE carmw_ui)
+        target_compile_options(carmw_display_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_display COMMAND carmw_display_tests)
+
+        add_executable(carmw_i18n_tests tests/test_i18n.c)
+        target_link_libraries(carmw_i18n_tests PRIVATE carmw_ui)
+        target_compile_options(carmw_i18n_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_i18n COMMAND carmw_i18n_tests)
+
+        add_executable(carmw_font_tests tests/test_fonts.c)
+        target_link_libraries(carmw_font_tests PRIVATE carmw_ui)
+        target_compile_options(carmw_font_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_fonts COMMAND carmw_font_tests)
+        set_tests_properties(carmw_fonts PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+        add_executable(carmw_settings_perf_tests tests/test_settings_perf.c)
+        target_link_libraries(carmw_settings_perf_tests PRIVATE carmw_ui)
+        target_compile_options(carmw_settings_perf_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_settings_perf COMMAND carmw_settings_perf_tests)
+        set_tests_properties(carmw_settings_perf PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
         add_executable(carmw_overlay_tests tests/test_overlays.c)
         target_link_libraries(carmw_overlay_tests PRIVATE carmw_ui)
         target_compile_options(carmw_overlay_tests PRIVATE ${CARMW_WARN_FLAGS})
@@ -213,6 +255,7 @@ if(CARMW_BUILD_UI)
     endif()
 
     add_executable(carmw_ui_demo main.c)
+    target_include_directories(carmw_ui_demo PRIVATE src)
     target_link_libraries(carmw_ui_demo PRIVATE carmw_ui)
     target_compile_options(carmw_ui_demo PRIVATE ${CARMW_WARN_FLAGS})
     set_target_properties(carmw_ui_demo PROPERTIES

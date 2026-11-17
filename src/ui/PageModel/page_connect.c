@@ -6,9 +6,9 @@
  *   内容区 546×264 于 (20,0)
  *   关闭提示：topMargin 50，宽 506，24 号居中，两行
  *   已连接：406×174 居中 → (70,45)，图拉伸铺满 + 3px #00C800 边框，
- *           模式名 16 号贴在图上方左侧（LVGL 用 18 号）
+ *           模式名 16 号贴在图上方左侧
  *   待连接：列居中、间距 14，行间距 10：
- *           模式图标 28×28 + "CURRENT MODE: xxx" 32 号（用 36）
+ *           模式图标 28×28 + "CURRENT MODE: xxx" 32 号
  *           蓝牙图标 28×28 + 提示 24 号
  *           26×26 占位 + "BLUETOOTH: xxx" 24 号 #00C6FF
  *   连接中：240×140 居中、圆角 12、#E0000000 + 1px #40FFFFFF，
@@ -52,6 +52,19 @@
 #define COLOR_BT_NAME 0x00C6FFU
 
 #define MODE_COUNT 3U
+
+/* LVGL 9.5 的 OVERFLOW_VISIBLE 还需要扩展实际绘制范围。 */
+static void overflow_draw_size(lv_event_t *event)
+{
+    lv_event_set_ext_draw_size(event, CARD_X + BODY_X);
+}
+
+static void allow_text_overflow(lv_obj_t *obj)
+{
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_add_event_cb(obj, overflow_draw_size, LV_EVENT_REFR_EXT_DRAW_SIZE, NULL);
+    lv_obj_refresh_ext_draw_size(obj);
+}
 
 /* 三种模式：0 Android Auto / 1 CarPlay / 2 HiCar */
 static const char *const s_icon_path[MODE_COUNT] = {
@@ -124,7 +137,7 @@ static void disabled_create(connect_card_t *card, lv_obj_t *body)
     lv_label_set_text(card->disabled,
                       "CONNECT IS OFF\nPLEASE ENABLE AND SELECT A MODE");
     lv_obj_set_width(card->disabled, BODY_W - 40);
-    lv_obj_set_style_text_font(card->disabled, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(card->disabled, UI_GEELY(24), 0);
     lv_obj_set_style_text_color(card->disabled, lv_color_white(), 0);
     lv_obj_set_style_text_align(card->disabled, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(card->disabled, LV_ALIGN_TOP_MID, 0, 50);
@@ -154,7 +167,7 @@ static void connected_create(connect_card_t *card, lv_obj_t *body)
 
     card->preview_name = lv_label_create(body);
     lv_label_set_text(card->preview_name, "");
-    lv_obj_set_style_text_font(card->preview_name, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(card->preview_name, UI_TEXT(16), 0);
     lv_obj_set_style_text_color(card->preview_name, lv_color_white(), 0);
     lv_obj_align_to(card->preview_name, card->connected,
                     LV_ALIGN_OUT_TOP_LEFT, 0, 0);
@@ -192,7 +205,7 @@ static void waiting_create(connect_card_t *card, lv_obj_t *body)
 
     card->wait_mode = lv_label_create(row);
     lv_label_set_text(card->wait_mode, "");
-    lv_obj_set_style_text_font(card->wait_mode, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_font(card->wait_mode, UI_GEELY(32), 0);
     lv_obj_set_style_text_color(card->wait_mode, lv_color_white(), 0);
 
     /* 第二行：蓝牙图标 + 提示 */
@@ -215,7 +228,7 @@ static void waiting_create(connect_card_t *card, lv_obj_t *body)
 
     label = lv_label_create(row);
     lv_label_set_text(label, "CONNECT BLUETOOTH FOR WIRELESS");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(label, UI_GEELY(24), 0);
     lv_obj_set_style_text_color(label, lv_color_white(), 0);
 
     /* 第三行：26×26 占位 + 蓝牙名称 */
@@ -231,7 +244,7 @@ static void waiting_create(connect_card_t *card, lv_obj_t *body)
 
     card->wait_bt_name = lv_label_create(row);
     lv_label_set_text(card->wait_bt_name, "");
-    lv_obj_set_style_text_font(card->wait_bt_name, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(card->wait_bt_name, UI_GEELY(24), 0);
     lv_obj_set_style_text_color(card->wait_bt_name,
                                 lv_color_hex(COLOR_BT_NAME), 0);
 
@@ -272,7 +285,7 @@ static void connecting_create(connect_card_t *card, lv_obj_t *body)
 
     label = lv_label_create(col);
     lv_label_set_text(label, "CONNECTING...");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(label, UI_GEELY(20), 0);
     lv_obj_set_style_text_color(label, lv_color_white(), 0);
 
     lv_obj_add_flag(card->connecting, LV_OBJ_FLAG_HIDDEN);
@@ -296,9 +309,15 @@ bool connect_card_create(connect_card_t *card, lv_obj_t *parent)
 
     content = ui_card_template_create(card->root, 0, 0, CARD_W, CARD_H,
                                       TITLE_H, "CONNECT",
-                                      &lv_font_montserrat_36);
+                                      UI_TEXT_BOLD(36));
+
+    /* Qt Item 默认不裁剪；原字体的英文提示比卡片宽，由外层中心区裁剪。 */
+    allow_text_overflow(card->root);
+    allow_text_overflow(lv_obj_get_parent(content));
+    allow_text_overflow(content);
 
     body = ui_blank_container(content);
+    allow_text_overflow(body);
     lv_obj_set_size(body, BODY_W, BODY_H);
     lv_obj_set_pos(body, BODY_X, BODY_Y);
 

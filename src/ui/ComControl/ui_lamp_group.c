@@ -12,6 +12,10 @@
 #define LAMP_GROUP_BLINK_FAST_MS 600U
 #define LAMP_GROUP_BLINK_SLOW_MS 6000U
 
+/* Qt 森林人自动启停灯（码 27）单独用 300ms / 3000ms，不走整组默认节奏 */
+#define LAMP_GROUP_AUTO_STOP_FAST_MS 300U
+#define LAMP_GROUP_AUTO_STOP_SLOW_MS 3000U
+
 /* 故障等级 -> ui_lamp 状态 */
 static void lamp_apply_level(ui_lamp_t *lamp, uint8_t level)
 {
@@ -208,6 +212,14 @@ void ui_lamp_group_apply(ui_lamp_group_t *group, const car_state_t *state)
             continue;
         }
 
+        if(cfg->gate == (uint8_t)UI_LAMP_GATE_AUTO_STOP) {
+            /* Qt visible: enableAutoStop 关闭时整盏灯熄灭，故障码仍留在 state */
+            if(!state->factory_auto_stop) {
+                lamp_apply_level(&rt->lamp, 0U);
+                continue;
+            }
+        }
+
         for(uint8_t v = 0; v < cfg->variant_count; ++v) {
             uint8_t level = car_state_warning_level(state,
                                                      cfg->variants[v].code);
@@ -242,5 +254,15 @@ void ui_lamp_group_apply(ui_lamp_group_t *group, const car_state_t *state)
         }
 
         lamp_apply_level(&rt->lamp, best_level);
+
+        /* 周期必须在灯态之后设：切到闪烁时会按整组默认值重建定时器 */
+        if(cfg->gate == (uint8_t)UI_LAMP_GATE_AUTO_STOP &&
+           (best_level == (uint8_t)CAR_WARN_BLINK_FAST ||
+            best_level == (uint8_t)CAR_WARN_BLINK_SLOW)) {
+            ui_lamp_set_blink_ms(&rt->lamp,
+                                 best_level == (uint8_t)CAR_WARN_BLINK_FAST
+                                     ? LAMP_GROUP_AUTO_STOP_FAST_MS
+                                     : LAMP_GROUP_AUTO_STOP_SLOW_MS);
+        }
     }
 }

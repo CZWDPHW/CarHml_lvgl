@@ -24,14 +24,16 @@ extern "C" {
 /* 根菜单分类数（行程资讯 / 信息选项 / 我的座驾 / 系统设置 / 互联设置） */
 #define UI_SETTINGS_ROOT_COUNT 5U
 
-/* 根菜单下标：本批只迁移“行程资讯 / 我的座驾 / 信息选项”，其余分类暂不进入 */
+/* 根菜单下标 */
 #define UI_SETTINGS_ROOT_ITINERARY 0U
 #define UI_SETTINGS_ROOT_MY_CAR 2U
 #define UI_SETTINGS_ROOT_INFO 1U
 #define UI_SETTINGS_ROOT_SYSTEM 3U
+#define UI_SETTINGS_ROOT_CONNECT 4U
 
 #define UI_SETTINGS_SYSTEM_COUNT 7U
 #define UI_SETTINGS_SYSTEM_VERSION 2U
+#define UI_SETTINGS_SYSTEM_ANIMATION 5U
 #define UI_SETTINGS_SYSTEM_BACK 6U
 
 /* 设置页索引：对应 Qt 的 settingStackView 深度 + 当前页 */
@@ -48,11 +50,30 @@ typedef enum {
     UI_SETTINGS_VIEW_ITINERARY_ASSIST, /* 行程资讯 → 驾驶员辅助子项 */
     UI_SETTINGS_VIEW_DRIVING_ASSIST,   /* 驾驶员辅助 → 驾驶辅助三项 */
     UI_SETTINGS_VIEW_SPEED_WARN,       /* 常规设置 → 超速预警值 */
+    UI_SETTINGS_VIEW_CONNECT,
+    UI_SETTINGS_VIEW_DATE,
+    UI_SETTINGS_VIEW_CLEAR_LOG,
     UI_SETTINGS_VIEW_SYSTEM,            /* 系统设置分类列表 */
     UI_SETTINGS_VIEW_VERSION,           /* 系统设置 → 版本信息 */
     UI_SETTINGS_VIEW_VEHICLE,           /* 行程资讯 → 车辆设置 */
     UI_SETTINGS_VIEW_LIGHT,             /* 车辆设置 → 灯光设置 */
     UI_SETTINGS_VIEW_DOOR,              /* 车辆设置 → 车门设置 */
+    UI_SETTINGS_VIEW_TURN,              /* 车辆设置 → 转向灯 */
+    UI_SETTINGS_VIEW_WIPER,             /* 车辆设置 → 雨刷器 */
+    UI_SETTINGS_VIEW_SERVICE,           /* 车辆设置 → 保养设置主列表 */
+    UI_SETTINGS_VIEW_SERVICE_ITEM,      /* 保养设置 → 机油/轮胎/自定义子页 */
+    UI_SETTINGS_VIEW_SERVICE_EDIT,      /* 保养设置 → 公里数数字编辑 */
+    UI_SETTINGS_VIEW_SELECT,            /* 通用多选：点灯灵敏度/灯光延时/车门自动上锁 */
+    UI_SETTINGS_VIEW_LANGUAGE,
+    UI_SETTINGS_VIEW_FACTORY_PASSWORD,
+    UI_SETTINGS_VIEW_FACTORY,
+    UI_SETTINGS_VIEW_FACTORY_FEATURES,
+    UI_SETTINGS_VIEW_FACTORY_ODO,
+    UI_SETTINGS_VIEW_FACTORY_TANK,
+    UI_SETTINGS_VIEW_FACTORY_MODEL,
+    UI_SETTINGS_VIEW_EPS,               /* 驾驶员辅助 → 电动助力转向 */
+    UI_SETTINGS_VIEW_PARKING,           /* 驾驶员辅助 → 驻车辅助 */
+    UI_SETTINGS_VIEW_CHASSIS,           /* 驾驶员辅助 → 底盘控制 */
 } ui_settings_view_t;
 
 /*
@@ -67,14 +88,55 @@ typedef enum {
     UI_SETTINGS_IT_COUNT = 4,
 } ui_settings_it_item_t;
 
-/* 驾驶员辅助子项（Qt DrivePeopleHelp）：驻车辅助/底盘控制未迁移，置灰 */
+/*
+ * 驾驶员辅助子项（Qt DrivePeopleHelp）：电动助力转向按工厂开关
+ * enableElectricPowerSteering（bit6）隐藏。
+ */
 typedef enum {
     UI_SETTINGS_ASSIST_DRIVING = 0, /* 驾驶辅助 */
-    UI_SETTINGS_ASSIST_PARKING = 1, /* 驻车辅助（未迁移） */
-    UI_SETTINGS_ASSIST_CHASSIS = 2, /* 底盘控制（未迁移） */
-    UI_SETTINGS_ASSIST_BACK = 3,    /* 返回 */
-    UI_SETTINGS_ASSIST_COUNT = 4,
+    UI_SETTINGS_ASSIST_PARKING = 1, /* 驻车辅助 */
+    UI_SETTINGS_ASSIST_CHASSIS = 2, /* 底盘控制 */
+    UI_SETTINGS_ASSIST_EPS = 3,     /* 电动助力转向 */
+    UI_SETTINGS_ASSIST_BACK = 4,    /* 返回 */
+    UI_SETTINGS_ASSIST_COUNT = 5,
 } ui_settings_assist_item_t;
+
+/*
+ * 驻车辅助（Qt ParkAssist）：移动物体 / 前方雷达 / 倒车雷达 / 显示 /
+ * 倒车侧预警（工厂开关 enableRearCrossTrafficAlert bit9）/
+ * 雷达音量 / 雷达探测距离 / 驻车辅助传感器（车型相关）/ 返回。
+ * 值与 ON/OFF 只显示 MCU 0x16 回读，OK 只发 SetGet。
+ */
+typedef enum {
+    UI_SETTINGS_PARK_MOVING_OBJECT = 0,  /* 0x16 index 4  */
+    UI_SETTINGS_PARK_FRONT_RADAR = 1,    /* 0x16 index 5  */
+    UI_SETTINGS_PARK_REAR_RADAR = 2,     /* 0x16 index 6  */
+    UI_SETTINGS_PARK_DISPLAY = 3,        /* 0x16 index 7  */
+    UI_SETTINGS_PARK_REAR_CROSS = 4,     /* 0x16 index 26 */
+    UI_SETTINGS_PARK_VOLUME = 5,         /* 0x16 index 17 */
+    UI_SETTINGS_PARK_DISTANCE = 6,       /* 0x16 index 18 */
+    UI_SETTINGS_PARK_SENSOR = 7,         /* 0x16 index 27 */
+    UI_SETTINGS_PARK_BACK = 8,
+    UI_SETTINGS_PARK_COUNT = 9,
+} ui_settings_parking_item_t;
+
+/* 底盘控制（Qt ChassistControl）：主动弯道控制 / 主动发动机制动 */
+typedef enum {
+    UI_SETTINGS_CHASSIS_TRACE = 0,  /* 0x16 index 8  */
+    UI_SETTINGS_CHASSIS_BRAKE = 1,  /* 0x16 index 19 */
+    UI_SETTINGS_CHASSIS_BACK = 2,
+    UI_SETTINGS_CHASSIS_COUNT = 3,
+} ui_settings_chassis_item_t;
+
+/*
+ * 电动助力转向（Qt ElectricPowerStepping）：一行选项 + 返回，
+ * 按下 OK 按 MCU 回读值切换 0 常规 / 1 运动（0x16 index 9）。
+ */
+typedef enum {
+    UI_SETTINGS_EPS_MODE = 0,
+    UI_SETTINGS_EPS_BACK = 1,
+    UI_SETTINGS_EPS_COUNT = 2,
+} ui_settings_eps_item_t;
 
 /*
  * 驾驶辅助三项（Qt DrivingHelp）：值为 MCU 真实状态，OK 只发 0x16 SetGet，
@@ -128,40 +190,96 @@ typedef enum {
 
 /*
  * 车辆设置子项（Qt CarSettings.leftModel 顺序）。
- * 转向灯/雨刷器/保养设置尚未迁移，置灰不可进入。
  */
 typedef enum {
     UI_SETTINGS_VEH_LIGHT = 0,   /* 灯光设置 */
-    UI_SETTINGS_VEH_TURN = 1,    /* 转向灯（未迁移） */
+    UI_SETTINGS_VEH_TURN = 1,    /* 转向灯 */
     UI_SETTINGS_VEH_DOOR = 2,    /* 车门设置 */
-    UI_SETTINGS_VEH_WIPER = 3,   /* 雨刷器（未迁移） */
-    UI_SETTINGS_VEH_SERVICE = 4, /* 保养设置（未迁移） */
-    UI_SETTINGS_VEH_BACK = 5,    /* 返回 */
-    UI_SETTINGS_VEH_COUNT = 6,
+    UI_SETTINGS_VEH_WIPER = 3,   /* 雨刷器 */
+    UI_SETTINGS_VEH_SERVICE = 4, /* 保养设置 */
+    UI_SETTINGS_VEH_REMOTE_START = 5, /* 远程启动发动机（index 23） */
+    UI_SETTINGS_VEH_BACK = 6,    /* 返回 */
+    UI_SETTINGS_VEH_COUNT = 7,
 } ui_settings_vehicle_item_t;
 
 /*
- * 灯光设置（Qt LightSettings）：迎宾灯 index 10、室内自动点灯 index 11。
- * 点灯灵敏度/灯光关闭延时受工厂配置门控（缺省关闭），本工程暂不迁移。
+ * 灯光设置（Qt LightSettings）：迎宾灯 index 10、室内自动点灯 index 11、
+ * 点灯灵敏度（扩展 control 2）、灯光关闭延时（扩展 control 1）。
  */
 typedef enum {
     UI_SETTINGS_LIGHT_WELCOME = 0,       /* 0x16 index 10 */
     UI_SETTINGS_LIGHT_AUTO_INTERIOR = 1, /* 0x16 index 11 */
-    UI_SETTINGS_LIGHT_BACK = 2,          /* 返回 */
-    UI_SETTINGS_LIGHT_COUNT = 3,
+    UI_SETTINGS_LIGHT_SENSITIVITY = 2,   /* 0x16 扩展 control 2 */
+    UI_SETTINGS_LIGHT_DELAY = 3,         /* 0x16 扩展 control 1 */
+    UI_SETTINGS_LIGHT_BACK = 4,          /* 返回 */
+    UI_SETTINGS_LIGHT_COUNT = 5,
 } ui_settings_light_item_t;
 
 /*
- * 车门设置（Qt DoorSetting）：喇叭响应 index 15、
- * 车门自动解锁 index 16（3 个选项循环）。
- * 外部车门/单车门解锁/智能钥匙/选择解锁受工厂配置门控（缺省关闭），暂不迁移。
+ * 车门设置（Qt DoorSetting）：喇叭响应 index 15、车门自动解锁 index 16、
+ * 外部车门 index 13、单车门解锁 index 14、智能钥匙 index 24、
+ * 选择解锁 index 25、车门自动上锁 index 28。
  */
 typedef enum {
     UI_SETTINGS_DOOR_HORN = 0,        /* 0x16 index 15 */
     UI_SETTINGS_DOOR_AUTO_UNLOCK = 1, /* 0x16 index 16 */
-    UI_SETTINGS_DOOR_BACK = 2,        /* 返回 */
-    UI_SETTINGS_DOOR_COUNT = 3,
+    UI_SETTINGS_DOOR_EXTERNAL = 2,    /* 0x16 index 13 */
+    UI_SETTINGS_DOOR_SINGLE_UNLOCK = 3, /* 0x16 index 14 */
+    UI_SETTINGS_DOOR_SMART_KEY = 4,   /* 0x16 index 24 */
+    UI_SETTINGS_DOOR_SELECT_UNLOCK = 5, /* 0x16 index 25 */
+    UI_SETTINGS_DOOR_AUTO_LOCK = 6,   /* 0x16 index 28 */
+    UI_SETTINGS_DOOR_BACK = 7,        /* 返回 */
+    UI_SETTINGS_DOOR_COUNT = 8,
 } ui_settings_door_item_t;
+
+/* 转向灯（Qt TurnLightSet）：变更车道闪灯 3 次 index 12 */
+typedef enum {
+    UI_SETTINGS_TURN_LANE_CHANGE = 0, /* 0x16 index 12 */
+    UI_SETTINGS_TURN_BACK = 1,
+    UI_SETTINGS_TURN_COUNT = 2,
+} ui_settings_turn_item_t;
+
+/* 雨刷器（Qt WiperSet）：index 20 / 21 / 22 */
+typedef enum {
+    UI_SETTINGS_WIPER_SPEED_SENSE = 0, /* 0x16 index 20 */
+    UI_SETTINGS_WIPER_REAR_LINKAGE = 1,/* 0x16 index 21 */
+    UI_SETTINGS_WIPER_MIST = 2,        /* 0x16 index 22 */
+    UI_SETTINGS_WIPER_BACK = 3,
+    UI_SETTINGS_WIPER_COUNT = 4,
+} ui_settings_wiper_item_t;
+
+/* 保养设置主列表（Qt Service） */
+typedef enum {
+    UI_SETTINGS_SERVICE_OIL = 0,
+    UI_SETTINGS_SERVICE_TIRE = 1,
+    UI_SETTINGS_SERVICE_CUSTOM = 2,
+    UI_SETTINGS_SERVICE_BACK = 3,
+    UI_SETTINGS_SERVICE_COUNT = 4,
+} ui_settings_service_item_t;
+
+/* 保养子页（Qt PageOilChangeSetting 第一层） */
+typedef enum {
+    UI_SETTINGS_SVC_SET_KM = 0,
+    UI_SETTINGS_SVC_REMAIN_KM = 1,
+    UI_SETTINGS_SVC_RESET = 2,
+    UI_SETTINGS_SVC_BACK = 3,
+    UI_SETTINGS_SVC_COUNT = 4,
+} ui_settings_service_row_t;
+
+#define UI_SETTINGS_SVC_DIGITS 6U
+#define UI_SETTINGS_SVC_EDIT_CONFIRM 6U
+#define UI_SETTINGS_SVC_EDIT_BACK 7U
+#define UI_SETTINGS_SVC_EDIT_COUNT 8U
+
+/* 通用多选页：点灯灵敏度 / 灯光关闭延时 / 车门自动上锁 */
+typedef enum {
+    UI_SETTINGS_SELECT_SENSITIVITY = 0, /* 4 项，扩展 control 2 */
+    UI_SETTINGS_SELECT_DELAY = 1,       /* 8 项，扩展 control 1 */
+    UI_SETTINGS_SELECT_AUTO_LOCK = 2,   /* 3 项，index 28 */
+    UI_SETTINGS_SELECT_ANIMATION = 3,   /* 2 项，本地配置 */
+} ui_settings_select_kind_t;
+
+#define UI_SETTINGS_SELECT_MAX 9U /* 最多 8 个选项 + 返回 */
 
 /* 我的座驾子项下标（固定清单，未迁移项置灰不可执行） */
 typedef enum {
@@ -206,23 +324,46 @@ typedef struct {
     uint8_t it_index;      /* 行程资讯子项，0xFF = -1 */
     uint8_t assist_index;  /* 驾驶员辅助子项，0xFF = -1 */
     uint8_t driving_assist_index; /* 驾驶辅助三项，0xFF = -1 */
+    uint8_t eps_index;            /* 电动助力转向行，0xFF = -1 */
+    uint8_t parking_index;        /* 驻车辅助行，0xFF = -1 */
+    uint8_t chassis_index;        /* 底盘控制行，0xFF = -1 */
     uint8_t vehicle_index;        /* 车辆设置子项，0xFF = -1 */
     uint8_t light_index;          /* 灯光设置行，0xFF = -1 */
     uint8_t door_index;           /* 车门设置行，0xFF = -1 */
+    uint8_t turn_index;           /* 转向灯行，0xFF = -1 */
+    uint8_t wiper_index;          /* 雨刷器行，0xFF = -1 */
+    uint8_t service_index;        /* 保养主列表行，0xFF = -1 */
+    uint8_t service_type;         /* 保养项目：0 机油 / 1 轮胎 / 2 自定义 */
+    uint8_t service_row;          /* 保养子页行，0xFF = -1 */
+    uint8_t service_digit_index;  /* 数字编辑当前位 0~5，6 确认，7 返回 */
+    uint8_t service_digits[UI_SETTINGS_SVC_DIGITS]; /* 数字编辑缓冲 */
+    bool service_editing;         /* 是否处于数字编辑页 */
     uint8_t speed_warn_digits[3]; /* 百/十/个位，运行期编辑缓冲 */
     uint8_t speed_warn_digit_index;
+    uint8_t select_kind;          /* ui_settings_select_kind_t */
+    uint8_t select_index;         /* 多选当前行，0xFF = -1 */
+    uint8_t select_saved_index;   /* 多选已保存项（回读值） */
     uint8_t system_index;
+    uint8_t date_index;
+    uint16_t date_values[5];
+    uint16_t date_year_base;      /* 年份滚轮起点：max(2000, 当前年 - 5)，Qt yearModel */
+    uint8_t date_focus;           /* 滚轮焦点列 0~4，5 = 确认；0xFF = 未进入滚轮 */
+    /* Qt PageDateSettings：itemIndex 0 滚轮 / 1 时间制式 / 2 时间源 / 3 返回；
+     * childNextOrBack = 光标移动到端点后反向 */
+    uint8_t date_item;
+    bool date_child_back;
+    uint8_t factory_index;
+    uint8_t factory_digits[6];
+    bool factory_unlocked;
+    bool factory_error;
 } ui_settings_state_t;
 
 typedef struct {
     lv_obj_t *root;                 /* 窗口容器（594×504），即页面根对象 */
     lv_obj_t *title;                /* 标题（根页留空） */
-    lv_obj_t *body;                 /* 子页内容容器（y=160，高 370） */
+    lv_obj_t *body;                 /* 分类列表 y=160；压栈子页 y=140 */
     lv_obj_t *root_bar;             /* 根分类横排 */
     lv_obj_t *root_menu[UI_SETTINGS_ROOT_COUNT];
-    lv_obj_t *root_label;           /* 轮盘正前方卡片的名称 */
-    int32_t root_pos;               /* 轮盘当前位置 ×1000（动画中为小数） */
-    int32_t root_target;            /* 轮盘目标位置 ×1000 */
     lv_obj_t *mycar_list;           /* 我的座驾子项列表 */
     lv_obj_t *mycar_rows[UI_SETTINGS_MYCAR_COUNT];
     lv_obj_t *style_list;
@@ -249,15 +390,54 @@ typedef struct {
     lv_obj_t *assist_rows[UI_SETTINGS_ASSIST_COUNT];
     lv_obj_t *drv_assist_list;      /* 驾驶辅助：三项开关 + 返回 */
     lv_obj_t *drv_assist_rows[UI_SETTINGS_DA_COUNT];
+    lv_obj_t *eps_list;             /* 电动助力转向：模式 + 返回 */
+    lv_obj_t *eps_rows[UI_SETTINGS_EPS_COUNT];
+    lv_obj_t *parking_list;         /* 驻车辅助：开关/选项 + 返回 */
+    lv_obj_t *parking_rows[UI_SETTINGS_PARK_COUNT];
+    lv_obj_t *chassis_list;         /* 底盘控制：两项开关 + 返回 */
+    lv_obj_t *chassis_rows[UI_SETTINGS_CHASSIS_COUNT];
     lv_obj_t *vehicle_list;         /* 车辆设置：灯光/车门/返回 */
     lv_obj_t *vehicle_rows[UI_SETTINGS_VEH_COUNT];
     lv_obj_t *light_list;           /* 灯光设置：迎宾灯/室内自动点灯 + 返回 */
     lv_obj_t *light_rows[UI_SETTINGS_LIGHT_COUNT];
     lv_obj_t *door_list;            /* 车门设置：喇叭响应/自动解锁 + 返回 */
     lv_obj_t *door_rows[UI_SETTINGS_DOOR_COUNT];
+    lv_obj_t *turn_list;            /* 转向灯 */
+    lv_obj_t *turn_rows[UI_SETTINGS_TURN_COUNT];
+    lv_obj_t *wiper_list;           /* 雨刷器 */
+    lv_obj_t *wiper_rows[UI_SETTINGS_WIPER_COUNT];
+    lv_obj_t *service_list;         /* 保养主列表 */
+    lv_obj_t *service_rows[UI_SETTINGS_SERVICE_COUNT];
+    lv_obj_t *service_item_list;    /* 保养子页 */
+    lv_obj_t *service_item_rows[UI_SETTINGS_SVC_COUNT];
+    lv_obj_t *service_edit_list;    /* 数字编辑 */
+    lv_obj_t *service_edit_digits[UI_SETTINGS_SVC_DIGITS];
+    lv_obj_t *service_edit_rows[2]; /* 确认 / 返回 */
+    lv_obj_t *select_list;          /* 通用多选页 */
+    lv_obj_t *select_rows[UI_SETTINGS_SELECT_MAX];
     lv_obj_t *speed_warn_list;
+    lv_obj_t *date_list;
+    lv_obj_t *date_rows[9];
+    /* 日期时间滚轮页（Qt PageDateSettings instrumentMode） */
+    lv_obj_t *date_wheel_list;
+    lv_obj_t *date_wheel_group;    /* 滚轮条整体（Qt dateTimeItem，负责 scale 动画） */
+    lv_obj_t *date_wheel_box;      /* 滚轮背景 */
+    lv_obj_t *date_wheel_cols[5];  /* 年/月/日/时/分 三行文本栏 */
+    lv_obj_t *date_wheel_cells[5][3];
+    lv_obj_t *date_wheel_confirm;
+    lv_obj_t *date_wheel_format;
+    lv_obj_t *date_wheel_source;
+    lv_obj_t *date_wheel_back;
+    lv_obj_t *date_wheel_rows[3];  /* 时间制式 / 时间源 / 返回 */
+    car_clock_t date_clock;
+    car_units_t date_units;
+    uint8_t time_source;
+    char connect_name[96];
+    lv_obj_t *factory_list;
+    lv_obj_t *factory_rows[20];
+    car_car_model_t factory_models;
     lv_obj_t *system_list;
-    lv_obj_t *system_rows[7];
+    lv_obj_t *system_rows[UI_SETTINGS_SYSTEM_COUNT];
     lv_obj_t *version_list;
     lv_obj_t *version_values[5];
     lv_obj_t *version_updated;
@@ -268,6 +448,12 @@ typedef struct {
     lv_obj_t *pending_hint;         /* 底部“改动待保存”提示 */
 
     bool active;                    /* 已打开，且车速 < 5 */
+    bool view_ready;
+    ui_settings_view_t shown_view;
+    uint8_t shown_root;
+    unsigned shown_cleanup_status;
+    bool system_version_loaded;
+    char system_version[CAR_TEXT_MAX];
     ui_settings_state_t st;         /* 层级状态（与 ui_app 同步） */
 } ui_settings_page_t;
 
@@ -289,6 +475,12 @@ void ui_settings_page_set_settings(car_settings_t *settings);
  */
 typedef void (*ui_settings_page_cmd_cb_t)(const car_cmd_t *cmd);
 void ui_settings_page_set_cmd_cb(ui_settings_page_cmd_cb_t cb);
+
+/* Platform callbacks run on the UI thread; start must only enqueue work. */
+typedef bool (*ui_settings_cleanup_start_cb_t)(void);
+typedef unsigned (*ui_settings_cleanup_status_cb_t)(void);
+void ui_settings_page_set_cleanup_cb(ui_settings_cleanup_start_cb_t start,
+                                     ui_settings_cleanup_status_cb_t status);
 
 /* 是否已打开且车速 < 5 */
 bool ui_settings_page_is_active(const ui_settings_page_t *page);
@@ -316,17 +508,29 @@ void ui_settings_page_set_driver_assist(ui_settings_page_t *page,
                                         bool emergency,
                                         bool lane,
                                         bool blind);
+/* 电动助力转向回读值（0x16 index 9）：0 常规 / 1 运动，只显示 MCU 值 */
+void ui_settings_page_set_steering_mode(ui_settings_page_t *page, uint8_t mode);
+/*
+ * 驻车辅助 / 底盘控制回读值（ui_app 每次 apply 注入）。
+ * 设置页只显示回读值，OK 时取反（或循环）下发 0x16，不本地翻转。
+ */
+void ui_settings_page_set_parking_chassis(ui_settings_page_t *page,
+                                          const car_parking_chassis_t *pc);
 /*
  * 车辆设置项的 MCU 回读值（ui_app 每次 apply 注入）。
  * 设置页只显示回读值，OK 时取反下发 0x16，不本地翻转。
  */
+/* 车辆设置回读值注入（0x16），仅在快照变化时刷新 */
 void ui_settings_page_set_vehicle_settings(ui_settings_page_t *page,
-                                           bool welcome_light,
-                                           bool auto_interior_light,
-                                           bool horn_feedback,
-                                           uint8_t auto_door_unlock);
+                                           const car_vehicle_setting_t *vs);
+
+/* 保养公里数（0x36 Status 回读）：按项目 0 机油 / 1 轮胎 / 2 自定义注入 */
+void ui_settings_page_set_service(ui_settings_page_t *page,
+                                  const car_maintenance_t *maint);
 void ui_settings_page_set_speed_warning(ui_settings_page_t *page, bool valid,
                                         uint8_t speed_kph);
+void ui_settings_page_set_date(ui_settings_page_t *page, const car_clock_t *clock,
+                               const car_units_t *units, uint8_t source);
 void ui_settings_page_set_version(ui_settings_page_t *page,
                                   const char *main_version, bool main_valid,
                                   const char *chip_version, bool chip_valid,

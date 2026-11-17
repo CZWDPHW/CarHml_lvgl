@@ -26,23 +26,45 @@ void car_state_init(car_state_t *state)
     state->driver_assist.emergency_braking = true;
     state->driver_assist.lane_departure_warning = true;
     state->driver_assist.blind_spot_warning = true;
+    /* Qt SettingsMgr.steeringMode 缺省 0（常规） */
+    state->driver_assist.steering_mode = 0U;
     state->driver_assist.valid = false;
     /* Qt SettingsMgr 车辆设置项缺省：开关为 true，选项为 0 */
     state->vehicle_setting.welcome_light = true;
     state->vehicle_setting.auto_interior_light = true;
+    state->vehicle_setting.lane_change_flash = true;
     state->vehicle_setting.external_doors = true;
     state->vehicle_setting.single_door_unlock = true;
     state->vehicle_setting.horn_feedback = true;
     state->vehicle_setting.auto_door_unlock = 0U;
     state->vehicle_setting.smart_door_unlock = true;
     state->vehicle_setting.select_unlock = true;
+    state->vehicle_setting.remote_engine_start = false;
+    state->vehicle_setting.rain_sensing_wipers = true;
+    state->vehicle_setting.rear_wiper_reverse_linkage = true;
+    state->vehicle_setting.wiper_mist_mode = true;
     state->vehicle_setting.auto_door_lock = 0U;
+    state->vehicle_setting.rain_sensor = false;
     state->vehicle_setting.headlight_sensitivity = 0U;
     state->vehicle_setting.headlight_off_delay = 0U;
     state->vehicle_setting.valid = false;
+    /* Qt SettingsMgr 驻车辅助/底盘控制缺省：开关 true，选项 0 */
+    state->parking_chassis.moving_object = true;
+    state->parking_chassis.front_radar = true;
+    state->parking_chassis.rear_radar = true;
+    state->parking_chassis.radar_display = true;
+    state->parking_chassis.rear_cross_traffic = true;
+    state->parking_chassis.radar_volume = 0U;
+    state->parking_chassis.radar_distance = 0U;
+    state->parking_chassis.parking_sensor = 0U;
+    state->parking_chassis.active_trace_control = true;
+    state->parking_chassis.active_engine_brake = true;
+    state->parking_chassis.valid = false;
     /* Qt radaronoff 实为雷达开启，缺省 true；show4h 缺省 false */
     state->radar_on = true;
     state->show_4h = false;
+    /* Qt m_enableAutoStop 缺省 false */
+    state->factory_auto_stop = false;
     state->carplay_active = false;
 }
 

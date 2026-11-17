@@ -18,6 +18,7 @@ extern "C" {
 
 typedef struct {
     lv_obj_t *root; /* 64×64 根容器，整组显示/隐藏 */
+    bool right_hand_drive;
 } ui_small_door_t;
 
 /*
@@ -31,6 +32,7 @@ bool ui_small_door_create(ui_small_door_t *door, lv_obj_t *parent,
 
 /* 显示/隐藏整组图片；重复调用无副作用 */
 void ui_small_door_show(ui_small_door_t *door, bool show);
+void ui_small_door_set_right_hand_drive(ui_small_door_t *door, bool right_hand);
 
 #ifdef __cplusplus
 }

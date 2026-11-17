@@ -80,12 +80,12 @@ void ui_mileage_apply(ui_mileage_t *mileage, const car_mileage_t *src,
     }
     else if(src->trip_type == 1) {
         /* trip_type：0 ODO / 1 TRIP A / 2 TRIP B */
-        prefix = "Trip A:";
+        prefix = "TripA:";
         raw = src->trip_a_raw;
         key = src->trip_type;
     }
     else if(src->trip_type == 2) {
-        prefix = "Trip B:";
+        prefix = "TripB:";
         raw = src->trip_b_raw;
         key = src->trip_type;
     }

@@ -128,7 +128,7 @@ bool chassis_card_create(chassis_card_t *card, lv_obj_t *parent)
     title = lv_label_create(card->root);
     lv_label_set_text(title, "CHASSIS");
     lv_obj_set_width(title, CARD_W);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_font(title, UI_TEXT(38), 0);
     lv_obj_set_style_text_color(title, lv_color_white(), 0);
     lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(title, 0, TITLE_Y);
@@ -137,7 +137,7 @@ bool chassis_card_create(chassis_card_t *card, lv_obj_t *parent)
     card->angle_label = lv_label_create(card->root);
     lv_label_set_text(card->angle_label, "");
     lv_obj_set_width(card->angle_label, CARD_W);
-    lv_obj_set_style_text_font(card->angle_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(card->angle_label, UI_TEXT_BOLD(26), 0);
     lv_obj_set_style_text_color(card->angle_label, lv_color_hex(COL_TRAJ), 0);
     lv_obj_set_style_text_align(card->angle_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_pos(card->angle_label, ANGLE_OFF_X, ANGLE_Y);

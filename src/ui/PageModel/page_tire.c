@@ -63,12 +63,12 @@ static void block_create(tire_card_t *card, uint8_t i, lv_obj_t *area,
 
     card->value[i] = lv_label_create(row);
     lv_label_set_text(card->value[i], "---");
-    lv_obj_set_style_text_font(card->value[i], &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(card->value[i], UI_GEELY(24), 0);
     lv_obj_set_style_text_color(card->value[i], lv_color_white(), 0);
 
     card->unit[i] = lv_label_create(row);
     lv_label_set_text(card->unit[i], "kpa");
-    lv_obj_set_style_text_font(card->unit[i], &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(card->unit[i], UI_GEELY(18), 0);
     lv_obj_set_style_text_color(card->unit[i], lv_color_white(), 0);
     lv_obj_set_style_pad_bottom(card->unit[i], 2, 0);   /* bottomMargin 2 */
 }
@@ -94,7 +94,7 @@ bool tire_card_create(tire_card_t *card, lv_obj_t *parent)
         /* Qt 标题为「胎压信息」36 号中文；LVGL 自带字体无完整中文字形，改用英文标题 */
         lv_label_set_text(title, "TIRE PRESSURE");
         lv_obj_set_width(title, CARD_W - 100);
-        lv_obj_set_style_text_font(title, &lv_font_montserrat_36, 0);
+        lv_obj_set_style_text_font(title, UI_TEXT_BOLD(36), 0);
         lv_obj_set_style_text_color(title, lv_color_white(), 0);
         lv_obj_set_style_text_align(title, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(title, LV_ALIGN_TOP_MID, 0, TITLE_TOP);

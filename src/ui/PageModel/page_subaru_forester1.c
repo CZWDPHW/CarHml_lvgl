@@ -84,6 +84,7 @@ typedef struct {
     lv_obj_t *car_turn_left;
     lv_obj_t *car_turn_right;
     uint8_t car_frame;        /* 当前帧 0~3 */
+    bool right_hand_drive;
     uint8_t car_running;      /* 帧动画是否运行 */
     uint32_t car_frame_tick;  /* 上一帧时间戳 */
     uint8_t car_color_applied; /* 车身染色是否已生效（0 未染色） */
@@ -315,12 +316,23 @@ static const ui_lamp_group_item_t s_bottom_lamp_items[] = {
     { .variants = {{"WarnIcon/engine_faulty.png", 2U, 0U}}, .variant_count = 1,
       .x = 660, .y = 630, .w = 52, .h = 52 },
 
-    /* 自动启停警告 (64×64 容器内居中) 64×64，码 27 / 219 */
-    { .variants = {{"WarnIcon/217.png", 27U, 219U}}, .variant_count = 1,
+    /*
+     * 自动启停警告 (64×64 容器内居中) 64×64，码 27。
+     * Qt 容器 visible: originalCarId!==NissanXTrail16 && enableAutoStop；
+     * 码 27 特判为 300ms/3000ms 快慢闪（见 ui_lamp_group）。
+     */
+    { .variants = {{"WarnIcon/217.png", 27U, 0U}}, .variant_count = 1,
+      .gate = UI_LAMP_GATE_AUTO_STOP,
       .x = 712, .y = 630, .w = 64, .h = 64 },
 
-    /* 自动启停未检测到操作，与上一盏完全重叠，码 28 */
+    /* 自动启停未检测到操作，与上一盏完全重叠，码 219（同受自动启停可见性门控） */
+    { .variants = {{"WarnIcon/219.png", 219U, 0U}}, .variant_count = 1,
+      .gate = UI_LAMP_GATE_AUTO_STOP,
+      .x = 712, .y = 630, .w = 64, .h = 64 },
+
+    /* 智能怠速不可用，与上一盏完全重叠，码 28（Qt icon28 在该容器内） */
     { .variants = {{"WarnIcon/219.png", 28U, 0U}}, .variant_count = 1,
+      .gate = UI_LAMP_GATE_AUTO_STOP,
       .x = 712, .y = 630, .w = 64, .h = 64 },
 
     /* 智能怠速正在工作 (52×52) ，码 26 */
@@ -393,7 +405,7 @@ static void tach_gauge_create(lv_obj_t *parent, s1_page_t *ui)
  * 换算到页面坐标：容器 (640,235)，尺寸 660x340，源图偏移 (-170,-330)。
  *
  * 图层顺序与 Qt 一致：车道 → 车身 → 颜色遮罩 → 示宽灯 → 左右转向灯。
- * 车色 multiply 与右舵镜像依赖设置项，暂未接入（默认白色 = 无效果）。
+ * 右舵镜像限于本裁剪区域；900-170-660+100=170，区域位置保持不变。
  */
 static const char *const s_car_lane_paths[CAR_FRAME_COUNT] = {
     UI_IMG("SubaruForester/navigation/CheDao_01.png"),
@@ -519,6 +531,15 @@ static void car_view_apply(s1_page_t *ui, const car_state_t *st)
 {
     uint32_t now = lv_tick_get();
 
+    ui_small_door_set_right_hand_drive(&ui->mini_door, st->right_hand_drive);
+    if(ui->right_hand_drive != st->right_hand_drive) {
+        bool applied = true;
+        for(uint32_t i = 0; i < lv_obj_get_child_count(ui->car_clip); ++i) {
+            if(!ui_assets_mirror_image(lv_obj_get_child(ui->car_clip, i),
+                                       st->right_hand_drive, 170, 330, 660, 340)) applied = false;
+        }
+        if(applied) ui->right_hand_drive = st->right_hand_drive;
+    }
     car_view_apply_color(ui, &st->car_color);
 
     if(st->speed_rpm.valid && st->speed_rpm.speed_kph > 0U &&
@@ -551,14 +572,16 @@ static void car_view_apply(s1_page_t *ui, const car_state_t *st)
 
     /* 直接消费本次 ui_turn_signal_apply 的灯态，不再独立计时。 */
     if(st->turn.valid) {
-        if(ui_lamp_get_state(&ui->turn_signal.left) == UI_LAMP_ON) {
+        if(ui_lamp_get_state(st->right_hand_drive ? &ui->turn_signal.right :
+                            &ui->turn_signal.left) == UI_LAMP_ON) {
             lv_obj_remove_flag(ui->car_turn_left, LV_OBJ_FLAG_HIDDEN);
         }
         else {
             lv_obj_add_flag(ui->car_turn_left, LV_OBJ_FLAG_HIDDEN);
         }
 
-        if(ui_lamp_get_state(&ui->turn_signal.right) == UI_LAMP_ON) {
+        if(ui_lamp_get_state(st->right_hand_drive ? &ui->turn_signal.left :
+                            &ui->turn_signal.right) == UI_LAMP_ON) {
             lv_obj_remove_flag(ui->car_turn_right, LV_OBJ_FLAG_HIDDEN);
         }
         else {
@@ -730,7 +753,7 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
     lv_obj_t *set_label = lv_label_create(ui->set_badge);
     lv_label_set_text(set_label, "set");
     lv_obj_set_style_text_color(set_label, lv_color_black(), 0);
-    lv_obj_set_style_text_font(set_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(set_label, UI_TEXT_BOLD(28), 0);
     lv_obj_center(set_label);
     lv_obj_add_flag(ui->set_badge, LV_OBJ_FLAG_HIDDEN);
 
@@ -788,7 +811,7 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
 
         /* 定速巡航：Qt IconConstantSpeed 位于灯排末尾 (1024,98)，行高 52 */
     (void)ui_cruise_create(&ui->cruise, page, 1024, 98,
-                           &lv_font_montserrat_24, &lv_font_montserrat_14);
+                           UI_GEELY(24), UI_GEELY(14));
 
     /* 小车门：Qt PageSmallDoor 64×64 位于 (1152,92)，仅在故障码 22 时显示 */
     (void)ui_small_door_create(&ui->mini_door, page, 1152, 92,
@@ -801,17 +824,21 @@ static bool s1_create(ui_node_t *self, lv_obj_t *parent)
     water_forester1_create(&ui->water, page, 81, 295);
 
     /* 档位、里程、续航：控件通用，样式只决定坐标与字号 */
-    ui_gear_create(&ui->gear, page, 920, 564, 90, &lv_font_montserrat_46);
+    ui_gear_create(&ui->gear, page, 920, 564, 90, ui_font_get(UI_TYPE_FORGOTTEN, 62, false));
     ui_mileage_create(&ui->odo, page, 620, 586, UI_MILEAGE_ODO,
-                      &lv_font_montserrat_28);
+                      UI_TEXT_BOLD(28));
     ui_mileage_create(&ui->trip, page, 1610, 656, UI_MILEAGE_TRIP,
-                      &lv_font_montserrat_24);   /* 小计里程，Qt 位置 (1610,656) */
-    ui_range_create(&ui->range, page, 1110, 586, &lv_font_montserrat_24);
+                      UI_TEXT_BOLD(24));   /* 小计里程，Qt 位置 (1610,656) */
+    ui_range_create(&ui->range, page, 1110, 586, UI_TEXT_BOLD(24));
+    lv_obj_set_style_text_font(ui->range.prefix, ui_font_get(UI_TYPE_ARIAL, 24, false), 0);
+    lv_obj_set_style_text_font(ui->trip.prefix, ui_font_get(UI_TYPE_ARIAL, 24, true), 0);
 
     /* 时钟与车外温度：控件通用，样式只决定坐标与字号（Qt 位置 910,138 / 1160,145） */
-    ui_clock_create(&ui->clock, page, 910, 138, &lv_font_montserrat_36);
+    ui_clock_create(&ui->clock, page, 910, 138, ui_font_get(UI_TYPE_BEBAS, 36, true));
+    /* The Forester branch only overrides the hour/minute family in QML. */
+    lv_obj_set_style_text_font(ui->clock.colon, UI_GEELY(36), 0);
     ui_outside_temp_create(&ui->outside_temp, page, 1160, 145,
-                           &lv_font_montserrat_28);
+                           ui_font_get(UI_TYPE_BEBAS, 28, false));
     /* Qt SettingsMgr.outTemperature 缺省 false，温度行初始隐藏 */
     lv_obj_add_flag(ui->outside_temp.root, LV_OBJ_FLAG_HIDDEN);
 
@@ -882,6 +909,9 @@ static void s1_apply(ui_node_t *self, const car_state_view_t *view)
     /* Qt：y = 108 + (210 - 210 × p / 100)，p=100 时 y=108，p=0 时 y=318 */
     if(st->fuel.valid) {
         fuel_forester1_apply(&ui->fuel, st->fuel.percent);
+        /* 加油口方向图标：Qt 通用油量图标按左/右 + 低油量（icon_state==2）换图 */
+        fuel_forester1_apply_port(&ui->fuel, st->fuel.port_left,
+                                  st->fuel.icon_state);
     }
 
     /* 水温达到 HIGH 及以上时切高温图标，NORMAL 用普通温度计 */
@@ -982,9 +1012,9 @@ static void s1_apply(ui_node_t *self, const car_state_view_t *view)
     {
         bool settings_open = ui_app_settings_is_open();
 
-        ov_door_apply(&ui->ov_door, st, settings_open);
+        ov_door_apply(&ui->ov_door, st, settings_open || st->factory_hide_door);
         ov_tire_apply(&ui->ov_tire, st,
-                      ov_door_is_active(&ui->ov_door) || settings_open,
+                      ov_door_is_active(&ui->ov_door) || settings_open || st->factory_hide_tire,
                       ui_session_tire_event());
         ov_cruise_apply(&ui->ov_cruise, st,
                         ov_door_is_active(&ui->ov_door) ||

@@ -29,20 +29,20 @@ extern "C" {
 #include <pthread.h>
 
 typedef struct {
-    car_settings_t *settings;
-    pthread_t thread;
-    pthread_mutex_t lock;
-    pthread_cond_t cond;
+    car_settings_t *settings;// 本地设置
+    pthread_t thread;// 后台保存线程
+    pthread_mutex_t lock;// 保护版本号与条件变量的锁
+    pthread_cond_t cond;// 条件变量
     uint64_t requested_version; /* 待保存的目标版本，0 表示无请求 */
     uint64_t done_version;      /* 最近一次成功落盘的版本 */
     uint64_t failed_version;    /* 最近一次失败的版本，仅诊断 */
-    uint64_t saved_count;
-    uint64_t failed_count;
+    uint64_t saved_count;// 已成功保存的次数
+    uint64_t failed_count;// 已失败保存的次数
     bool seen;                  /* 已收到过真实 ACC 帧 */
     bool last_on;               /* 最近一次采样的 ACC 状态 */
     bool ever_on;               /* 运行期是否见过 ACC 开启 */
-    bool started;
-    bool stop;
+    bool started;// 是否已启动
+    bool stop_requested;// 是否请求停止
 } car_settings_saver_t;
 
 /*

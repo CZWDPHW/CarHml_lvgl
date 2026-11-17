@@ -21,6 +21,10 @@ const char *ui_assets_root(void);
  */
 const char *ui_assets_path(const char *rel);
 bool ui_assets_load_image(lv_image_dsc_t *dsc, const char *rel);
+/* Mirror only this image's crop; cached pixels are owned by the image object. */
+bool ui_assets_mirror_image(lv_obj_t *image, bool mirrored,
+                            int32_t crop_x, int32_t crop_y,
+                            int32_t width, int32_t height);
 
 #ifdef __cplusplus
 }

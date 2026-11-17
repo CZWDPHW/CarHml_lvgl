@@ -250,23 +250,23 @@ bool car_link_init(car_link_t *link, const car_port_t *port)
         return false;
     }
 
-    memset(link, 0, sizeof(*link));
-    link->port = *port;
-    link->ack_enabled = true;
-    link->stats.key_dropped = 0;
+    memset(link, 0, sizeof(*link));// 初始化链接结构体
+    link->port = *port;// 初始化串口端口
+    link->ack_enabled = true;// 启用 ACK 功能
+    link->stats.key_dropped = 0;// 初始化按键丢弃计数
 
-    car_lock_init(&link->lock);
-    car_parser_init(&link->parser);
+    car_lock_init(&link->lock);// 初始化锁
+    car_parser_init(&link->parser);// 初始化解析器
     car_parser_set_policy(&link->parser, car_registry_accept, NULL);
-    car_state_init(&link->pending);
-    car_state_store_init(&link->store);
-    car_session_init(&link->session, car_port_now(&link->port));
+    car_state_init(&link->pending);// 初始化待处理状态
+    car_state_store_init(&link->store);// 初始化状态存储器
+    car_session_init(&link->session, car_port_now(&link->port));// 初始化握手话
 
     if(link->port.open != NULL) {
-        link->running = link->port.open(link->port.ctx);
+        link->running = link->port.open(link->port.ctx);// 打开串口端口
     }
 
-    return link->running;
+    return link->running;// 返回是否成功打开串口端口
 }
 
 void car_link_deinit(car_link_t *link)
@@ -361,7 +361,11 @@ static void *link_thread_main(void *argument)
     return NULL;
 }
 #endif
-
+/**
+ * @brief 启动链接
+ * @param link 链接
+ * @return true 是否成功启动
+ */
 bool car_link_start(car_link_t *link)
 {
 #ifdef CARMW_NO_THREADS
@@ -369,29 +373,29 @@ bool car_link_start(car_link_t *link)
     return false;
 #else
     if(link == NULL || !link->running) {
-        return false;
-    }
+        return false;// 链接未初始化或未打开串口端口
+       }
 
     if(link->thread_started) {
-        return true;
-    }
+        return true;// 链接已启动
+       }
 
-    atomic_store(&link->stop_requested, false);
+    atomic_store(&link->stop_requested, false);// 初始化停止请求标志位
 
     pthread_attr_t attr;
-    pthread_attr_init(&attr);
+    pthread_attr_init(&attr);// 初始化线程属性
     (void)pthread_attr_setstacksize(&attr, 256U * 1024U);
 
-    link->thread_started = true;
+    link->thread_started = true;// 标记为已启动
 
     if(pthread_create(&link->thread, &attr, link_thread_main, link) != 0) {
-        link->thread_started = false;
+        link->thread_started = false;// 标记为未启动
         pthread_attr_destroy(&attr);
         return false;
     }
 
-    pthread_attr_destroy(&attr);
-    return true;
+    pthread_attr_destroy(&attr);// 销毁线程属性
+    return true;// 返回成功
 #endif
 }
 
@@ -412,11 +416,15 @@ void car_link_stop(car_link_t *link)
 
 bool car_link_exec(car_link_t *link, const car_cmd_t *command)
 {
-    if(link == NULL || command == NULL || !link->running) {
+    if(link == NULL || command == NULL) {
         return false;
     }
 
     if(command->len > CAR_CMD_PAYLOAD_MAX) {
+        return false;
+    }
+
+    if(!link->running) {
         return false;
     }
 
