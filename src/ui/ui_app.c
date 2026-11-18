@@ -14,6 +14,7 @@
 #include "ui/ui_common.h"
 #include "ui/ui_i18n.h"
 #include "ui/ui_session.h"
+#include "ui/overlays/ui_upgrade_popup.h"
 
 /* 设置页无按键自动关闭（Qt settingTimerOut 8000ms） */
 #define SETTINGS_TIMEOUT_MS 8000U
@@ -136,6 +137,7 @@ bool ui_app_init(void)
 /* 先卸载当前样式组件，再销毁设置覆盖层与舞台 */
 void ui_app_deinit(void)
 {
+    ui_upgrade_popup_destroy();
     if(s_node != NULL) {
         if(s_node->vt->on_hide != NULL) {
             s_node->vt->on_hide(s_node);
@@ -458,7 +460,7 @@ void ui_app_apply(const car_state_view_t *view)
 /* 按键事件：设置页 → 样式，逐级下发 */
 void ui_app_handle_key(const ui_key_event_t *evt)
 {
-    if(evt == NULL) {
+    if(evt == NULL || ui_upgrade_popup_active()) {
         return;
     }
 
@@ -519,6 +521,7 @@ void ui_app_settings_set_pending_cb(ui_app_pending_cb_t cb)
 
 void ui_app_settings_open(void)
 {
+    if(ui_upgrade_popup_active()) return;
     if(s_settings_page.root == NULL) {
         return;
     }

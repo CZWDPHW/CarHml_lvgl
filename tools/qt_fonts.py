@@ -16,7 +16,7 @@ import struct
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-SIZES = (14, 16, 18, 20, 22, 24, 26, 27, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 62, 64)
+SIZES = (14, 15, 16, 18, 20, 22, 24, 26, 27, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 62, 64)
 
 
 def sanitize_geely(source, output):

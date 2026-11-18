@@ -3,7 +3,7 @@
   "cjk_source": "NotoSansCJK-Regular.ttc",
   "cjk_sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a",
   "cjk_face": "Noto Sans CJK SC",
-  "glyph_symbols": "°×–…℃℉−、。一上下不个中串临为主义乐也互亚亮仅从令以仪件会传伯位低体余作佳使侧俄保信修倒值假偏停储像充光克免入全兰共关其养内册再写准出分列利到制刷前剩力功加动助匙匹区卓单占卡即厂历压原参及发取变口只叭可台史右号各同名后向启告员命响喇器四回固土在地均块坡型复外多夜大天失头如媒子字存安完定室容宽宾密对导将小就尼局工左已布希帧常平年并序库应底度座延开式引弯当录很德志快态急性总恢息意感慢成我或户手打把报拉择拼持挂指按挡换据捷排探接控摄撑播操擎支收改放故敏数文新方无日时是显智暂更最月有期未末本机来板查标校样格档检模正段每气池油法波注洁测济消清温源溢漏火灯灵点熄燃爆片版牙物状现班理用电画界留略白的监盘目盲相省瞬知短码破确示离移程符第等签简箱系紧繁线组经统续缓缺罗置翻而耗耳联胎能腊自航舵节芯英荷萄葡蓝行表被裂西规解触言警计认让讯设评词译试该语误请读调败资超足距跳踏踩车转轮辅辆达过迎运近返这进远连退送选逐通速道遮避部配里重量钥钮锁错门闪闭间阅阿限陡除障集雨雷雾靠面韩音页项顺预风马驱驶驻驾验高默％（），：；",
+  "glyph_symbols": "°×–…℃℉−。一上下不与中串临主义乐也互亚亮仅仍从以仪件任会传伯位低体余作佳使依侧俄保信修倒偏停像充光克免入全兰共关其养内册再写准出分列初利别到制刷前剩力功加务动助化匙匹区升卓单占卡即厂历压原参及发取变口叭可台史右号各同后向启告员响喇器四回固圆土在地均块坡型基境增备复外多夜大天失头如始媒子字存安完定室容宽宾密导将小尼局层工左已布希帧常平年并序库应底度座延开式弯当录待很德志快态急性总恢息意感慢成我或户所手找把报拉择拼持挂指按挡换据捷探接控插摄撑播操支收改放故敏数文断新方无日旧时是显智暂更最月有期未本机束来板查标校样格案档检模止正段每气池油法波注洁测济消清温源溢满漏火灯灵点熄燃爆片版牙物状环现班理用电画界留略白的监盘目盲直相省瞬知短码破础确示离秒移程符等签简箱系紧繁级线组经绑结统续缓缺罗置耗耳联胎能腊自航舵节芯英荷菜萄葡蓝行表被裂西要规解触言警计认让讯设评识词译试该语误请读调败资赖超足距跳踏踩车转轮载辅辆输达过迎运近返这进远连退送选逐通速道遮避部配里重量钥钮锁错门闪闭间阅阿陡除障集雨雷雾需靠面韩音页项预风马驱驶驻驾验高默！％（），：；",
   "fonts": [
     {
       "name": "ui_qt_text_14",
@@ -11,10 +11,21 @@
       "pixels": 14,
       "bold": false,
       "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
       "source": "Montserrat-Medium.ttf",
       "source_sha256": "421f26b23e2be6b98373d32acd3cb2897b154d4bf0a77d26534ce476e4cbed53",
-      "bytes": 287247,
-      "cjk_synthetic_bold": false
+      "bytes": 326754
+    },
+    {
+      "name": "ui_qt_text_15",
+      "family": "text",
+      "pixels": 15,
+      "bold": false,
+      "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
+      "source": "Montserrat-Medium.ttf",
+      "source_sha256": "421f26b23e2be6b98373d32acd3cb2897b154d4bf0a77d26534ce476e4cbed53",
+      "bytes": 353899
     },
     {
       "name": "ui_qt_text_16",
@@ -242,10 +253,10 @@
       "pixels": 18,
       "bold": true,
       "synthetic_bold": false,
+      "cjk_synthetic_bold": true,
       "source": "Montserrat-Bold.ttf",
       "source_sha256": "06a0e623bbaf4a0237f1d605affa269f9e431ff50c7143dcbb47b815edaba9bd",
-      "bytes": 412071,
-      "cjk_synthetic_bold": true
+      "bytes": 469997
     },
     {
       "name": "ui_qt_text_20_bold",
@@ -330,10 +341,10 @@
       "pixels": 32,
       "bold": true,
       "synthetic_bold": false,
+      "cjk_synthetic_bold": true,
       "source": "Montserrat-Bold.ttf",
       "source_sha256": "06a0e623bbaf4a0237f1d605affa269f9e431ff50c7143dcbb47b815edaba9bd",
-      "bytes": 775795,
-      "cjk_synthetic_bold": true
+      "bytes": 889762
     },
     {
       "name": "ui_qt_text_36_bold",

@@ -111,6 +111,9 @@ if(CARMW_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_upgrade_files.cmake)
 
     if(UNIX)
+        add_test(NAME carmw_watchdog COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_watchdog.sh
+            ${CMAKE_CURRENT_BINARY_DIR}/watchdog-test)
+        set_tests_properties(carmw_watchdog PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
         add_executable(carmw_log_cleanup_tests tests/test_log_cleanup.c)
         target_link_libraries(carmw_log_cleanup_tests PRIVATE carmw)
         target_compile_options(carmw_log_cleanup_tests PRIVATE ${CARMW_WARN_FLAGS})
@@ -203,6 +206,7 @@ if(CARMW_BUILD_UI)
         src/ui/overlays/ov_radar.c
         src/ui/overlays/ov_cruise.c
         src/ui/overlays/ov_tips.c
+        src/ui/overlays/ui_upgrade_popup.c
         src/ui/settings/ui_settings_page.c
         src/ui/settings/ui_settings_language.c
         src/ui/settings/ui_settings_menu.c
@@ -225,6 +229,11 @@ if(CARMW_BUILD_UI)
         target_link_libraries(carmw_display_tests PRIVATE carmw_ui)
         target_compile_options(carmw_display_tests PRIVATE ${CARMW_WARN_FLAGS})
         add_test(NAME carmw_display COMMAND carmw_display_tests)
+
+        add_executable(carmw_upgrade_ui_tests tests/test_upgrade_ui.c)
+        target_link_libraries(carmw_upgrade_ui_tests PRIVATE carmw_ui)
+        target_compile_options(carmw_upgrade_ui_tests PRIVATE ${CARMW_WARN_FLAGS})
+        add_test(NAME carmw_upgrade_ui COMMAND carmw_upgrade_ui_tests)
 
         add_executable(carmw_i18n_tests tests/test_i18n.c)
         target_link_libraries(carmw_i18n_tests PRIVATE carmw_ui)

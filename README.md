@@ -2,6 +2,8 @@
 
 修改设置菜单：见 [设置菜单维护指南](docs/SETTINGS_EDITING.md)。常用设置页在 `src/ui/settings/ui_settings_menu.c` 用普通 C 数组增删入口，功能绑定和各语言翻译分别维护。
 
+升级与回退：见 [Qt 升级迁移说明](docs/UPGRADE_PORT.md)，包含 APP、MCU、system_update、watchdog/rcS 接入、U 盘结构及分步提交记录。
+
 把 `0x2E` 帧流变成一份**带版本号和变更掩码的车况快照**：UI 只负责"取快照 + 判断哪一组变了"，
 既不碰串口、也不做字节解包。
 

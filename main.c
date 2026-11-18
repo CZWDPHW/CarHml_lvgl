@@ -23,6 +23,7 @@
 
 #if defined(CARMW_PLATFORM_BOARD)
 #include <signal.h>
+#include <unistd.h>
 
 #include "carmw/car_port_posix.h"
 #include "carmw/car_settings.h"
@@ -40,6 +41,7 @@
 #include "carmw/car_log_cleanup.h"
 #include "ui/settings/ui_settings_page.h"
 #include "ui/ui_display.h"
+#include "ui/overlays/ui_upgrade_popup.h"
 
 #if defined(CARMW_PLATFORM_BOARD)
 static bool settings_cleanup_start(void)
@@ -110,6 +112,12 @@ static lv_timer_t *s_refresh_timer;
 /* 本地持久设置：运行期只在内存，ACC 关闭统一落盘 */
 static car_settings_t s_settings;
 static car_settings_saver_t s_settings_saver;
+static car_upgrade_t *s_upgrade;
+static car_upgrade_status_t s_upgrade_status;
+static bool s_upgrade_reboot_started;
+static bool s_upgrade_reboot_blocked;
+static bool s_upgrade_reboot;
+static uint32_t s_upgrade_reboot_tick;
 #else
 /* PC 演示：设置只在内存里，进程退出即丢（文件读写只在板端验证） */
 static car_settings_t s_settings;
@@ -126,6 +134,9 @@ static void settings_changed(void *user, uint32_t mask)
 /* 注入给设置页：常规设置的背光/超速报警直接下发到 MCU */
 static void settings_send_cmd(const car_cmd_t *cmd)
 {
+#if defined(CARMW_PLATFORM_BOARD)
+    if(s_upgrade_status.visible) return;
+#endif
     (void)car_link_exec(&s_link, cmd);
 }
 
@@ -134,6 +145,42 @@ static void settings_send_cmd(const car_cmd_t *cmd)
 static bool settings_pending(void)
 {
     return car_settings_saver_pending(&s_settings_saver);
+}
+
+static bool upgrade_save_settings(void *user)
+{
+    (void)user;
+    return car_settings_saver_flush(&s_settings_saver,CAR_SETTINGS_SAVE_BUDGET_MS);
+}
+
+static void upgrade_tick(void)
+{
+    bool was_visible=s_upgrade_status.visible;
+    bool was_busy=s_upgrade_status.busy;
+    car_upgrade_poll(s_upgrade,&s_upgrade_status);
+    if(s_upgrade_status.busy && !was_busy) {
+        s_upgrade_reboot_blocked=false; s_upgrade_reboot_started=false;
+    }
+    if(s_upgrade_status.visible && !was_visible) ui_app_settings_close();
+    unsigned seconds=5;
+    if(s_upgrade_status.finished && s_upgrade_status.reboot_required && !s_upgrade_reboot_blocked) {
+        if(!s_upgrade_reboot_started) {
+            s_upgrade_reboot_started=true; s_upgrade_reboot_tick=lv_tick_get();
+        }
+        uint32_t elapsed=lv_tick_elaps(s_upgrade_reboot_tick);
+        seconds=elapsed>=5000?0:(5000-elapsed+999)/1000;
+        if(elapsed>=5000) {
+            if(upgrade_save_settings(NULL)) { s_upgrade_reboot=true; s_quit=1; }
+            else {
+                s_upgrade_reboot_blocked=true;
+                ui_upgrade_popup_restart_failed();
+                fprintf(stderr,"upgrade: refusing reboot because settings could not be saved\n");
+            }
+        }
+    } else if(!s_upgrade_status.reboot_required) {
+        s_upgrade_reboot_started=false;
+    }
+    ui_upgrade_popup_update(&s_upgrade_status,s_settings.values.language,seconds);
 }
 #endif
 
@@ -1078,6 +1125,7 @@ static void refresh_timer(lv_timer_t *timer)
     (void)timer;
 
 #if defined(CARMW_PLATFORM_BOARD)
+    upgrade_tick();
     /* 真实方向盘按键（0x20）：取出队列并映射到界面，与 Qt 行为一致 */
     (void)car_ui_key_pump(&s_link);
 #else
@@ -1406,6 +1454,16 @@ int main(int argc, char **argv)
     s_refresh_timer = lv_timer_create(refresh_timer, REFRESH_MS, NULL);// 创建刷新定时器
 
 #if defined(CARMW_PLATFORM_BOARD)
+    const car_upgrade_config_t upgrade_config={
+        .usb_root="/mnt/usb", .app_home="/opt/car", .system_root="/",
+        .serial=SERIAL_DEVICE, .baud=SERIAL_BAUD,
+        .save_settings=upgrade_save_settings
+    };
+    s_upgrade=car_upgrade_create(&upgrade_config,&s_link);
+    if(!s_upgrade) fprintf(stderr,"upgrade: could not start USB upgrade monitor\n");
+#endif
+
+#if defined(CARMW_PLATFORM_BOARD)
     printf("carmw UI demo: fbdev /dev/fb0 + %s@%d, Ctrl+C 退出\n",
            SERIAL_DEVICE, SERIAL_BAUD);
 #else
@@ -1417,6 +1475,8 @@ int main(int argc, char **argv)
 #if defined(CARMW_PLATFORM_BOARD)
     /* 关闭顺序：停 UI 定时器 -> 补存设置 -> join 收帧线程 -> 关串口 -> 销毁 UI */
     lv_timer_delete(s_refresh_timer);
+    car_upgrade_destroy(s_upgrade);
+    s_upgrade=NULL;
     if(!car_settings_saver_flush(&s_settings_saver, CAR_SETTINGS_SAVE_BUDGET_MS)) {
         fprintf(stderr, "car_settings flush failed, 仍有未落盘修改\n");
     }
@@ -1426,6 +1486,12 @@ int main(int argc, char **argv)
     ui_app_deinit();
     lv_deinit();
     printf("carmw UI demo: exit\n");
+    if(s_upgrade_reboot) {
+        /* Normal shutdown has saved settings and released the serial port. */
+        execl("/sbin/reboot","reboot",(char *)NULL);
+        fprintf(stderr,"upgrade: reboot exec failed; requesting watchdog fallback\n");
+        return 75;
+    }
 #endif
 
     return 0;

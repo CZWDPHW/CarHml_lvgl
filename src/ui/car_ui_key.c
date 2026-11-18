@@ -16,6 +16,7 @@
 
 #include "ui/ui_app.h"
 #include "ui/ui_node.h"
+#include "ui/overlays/ui_upgrade_popup.h"
 
 /* Qt 键值（Handler.js keyNames 下标） */
 #define KEY_BACK_HOME 13U
@@ -55,6 +56,7 @@ static bool map_key(const car_key_event_t *evt, ui_dispatch_ctx_t *ctx,
     if(evt->pressed == KEY_RELEASED) {
         return false;
     }
+    if(ui_upgrade_popup_active()) return false;
 
     in_settings = settings_visible();
 
