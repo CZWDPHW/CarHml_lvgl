@@ -3,7 +3,7 @@
   "cjk_source": "NotoSansCJK-Regular.ttc",
   "cjk_sha256": "b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a",
   "cjk_face": "Noto Sans CJK SC",
-  "glyph_symbols": "°×–…℃℉−。一上下不中主义乐也互亚亮仅以仪件会伯位低体余作佳使侧俄保信倒偏停像充光克免入全兰关其养内册准出分列利到制刷前剩力功加动助匙匹区卓单占卡即厂历压原参及发取变口叭可台史右同后向启告员响喇器四回固土在均块坡型外多夜大天失头如媒子字存安完定室容宽宾密导将小尼局工左已布希帧常平年并序库应底度座延开式当录很德志快态急性总息意感慢成我或户手报拉择拼持挂指按挡换据捷接控摄撑播操支收改放故敏数文新方无日时是显智暂更最月有期未本机来板查标校样格档检模正每气池油法波注洁测济消清温源溢漏火灯灵点熄燃爆片版牙状现班理用电画界留白的监盘目盲相省瞬知短码破确示离程符等签简箱系紧繁线组经统续缓缺罗置耗耳联胎能腊自航舵节芯英荷萄葡蓝行表被裂西规解触言警计认让讯设评词试该语误请读调败资超足距跳踏踩车转轮辅辆达过迎运近返进远连退送选逐通速道遮避部配里重量钥钮锁错门闪闭间阅阿陡除障集雨雷雾靠面韩音项预风马驱驶驻驾验高默％（），：",
+  "glyph_symbols": "°×–…℃℉−、。一上下不个中串临为主义乐也互亚亮仅从令以仪件会传伯位低体余作佳使侧俄保信修倒值假偏停储像充光克免入全兰共关其养内册再写准出分列利到制刷前剩力功加动助匙匹区卓单占卡即厂历压原参及发取变口只叭可台史右号各同名后向启告员命响喇器四回固土在地均块坡型复外多夜大天失头如媒子字存安完定室容宽宾密对导将小就尼局工左已布希帧常平年并序库应底度座延开式引弯当录很德志快态急性总恢息意感慢成我或户手打把报拉择拼持挂指按挡换据捷排探接控摄撑播操擎支收改放故敏数文新方无日时是显智暂更最月有期未末本机来板查标校样格档检模正段每气池油法波注洁测济消清温源溢漏火灯灵点熄燃爆片版牙物状现班理用电画界留略白的监盘目盲相省瞬知短码破确示离移程符第等签简箱系紧繁线组经统续缓缺罗置翻而耗耳联胎能腊自航舵节芯英荷萄葡蓝行表被裂西规解触言警计认让讯设评词译试该语误请读调败资超足距跳踏踩车转轮辅辆达过迎运近返这进远连退送选逐通速道遮避部配里重量钥钮锁错门闪闭间阅阿限陡除障集雨雷雾靠面韩音页项顺预风马驱驶驻驾验高默％（），：；",
   "fonts": [
     {
       "name": "ui_qt_text_14",
@@ -77,10 +77,10 @@
       "pixels": 26,
       "bold": false,
       "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
       "source": "Montserrat-Medium.ttf",
       "source_sha256": "421f26b23e2be6b98373d32acd3cb2897b154d4bf0a77d26534ce476e4cbed53",
-      "bytes": 580617,
-      "cjk_synthetic_bold": false
+      "bytes": 637302
     },
     {
       "name": "ui_qt_text_27",
@@ -541,6 +541,28 @@
       "cjk_synthetic_bold": false
     },
     {
+      "name": "ui_qt_arial_20",
+      "family": "arial",
+      "pixels": 20,
+      "bold": false,
+      "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
+      "source": "arial.ttf",
+      "source_sha256": "c9b76220a5be42ead4733611e417cd65c5fd8aeaa33eb56576ac378a37d130a1",
+      "bytes": 424308
+    },
+    {
+      "name": "ui_qt_arial_22",
+      "family": "arial",
+      "pixels": 22,
+      "bold": false,
+      "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
+      "source": "arial.ttf",
+      "source_sha256": "c9b76220a5be42ead4733611e417cd65c5fd8aeaa33eb56576ac378a37d130a1",
+      "bytes": 477920
+    },
+    {
       "name": "ui_qt_arial_24",
       "family": "arial",
       "pixels": 24,
@@ -561,6 +583,17 @@
       "source_sha256": "766f06ac8761f82f25d032a220e89438f6064591af9915061f20b949efdedf69",
       "bytes": 549133,
       "cjk_synthetic_bold": true
+    },
+    {
+      "name": "ui_qt_arial_28",
+      "family": "arial",
+      "pixels": 28,
+      "bold": false,
+      "synthetic_bold": false,
+      "cjk_synthetic_bold": false,
+      "source": "arial.ttf",
+      "source_sha256": "c9b76220a5be42ead4733611e417cd65c5fd8aeaa33eb56576ac378a37d130a1",
+      "bytes": 628285
     }
   ]
 }

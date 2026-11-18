@@ -18,7 +18,6 @@ static unsigned factory_count(ui_settings_page_t *p)
 {
     switch(p->st.view) {
     case UI_SETTINGS_VIEW_LANGUAGE: return 20;
-    case UI_SETTINGS_VIEW_FACTORY_PASSWORD: return 6;
     case UI_SETTINGS_VIEW_FACTORY_ODO: return 8;
     case UI_SETTINGS_VIEW_FACTORY_TANK: return 3;
     case UI_SETTINGS_VIEW_FACTORY_FEATURES: return 12;
@@ -44,9 +43,8 @@ static void factory_render(ui_settings_page_t *p)
             snprintf(text, sizeof(text), "%s%s%s", language_names[i],
                 !enabled ? " : UNSUPPORTED" : "", v && v->language == i ? " *" : "");
             break;
-        case UI_SETTINGS_VIEW_FACTORY_PASSWORD:
         case UI_SETTINGS_VIEW_FACTORY_ODO: {
-            unsigned digits = p->st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD ? 4 : 6;
+            unsigned digits = 6;
             if(i < digits) snprintf(text, sizeof(text), "%u: %u", i + 1, p->st.factory_digits[i]);
             else snprintf(text, sizeof(text), "%s", i == digits ?
                 (p->st.factory_error ? "WRONG PASSWORD" : "CONFIRM") : "CANCEL / BACK");
@@ -90,13 +88,12 @@ static void factory_render(ui_settings_page_t *p)
 static bool factory_key(ui_settings_page_t *p, uint8_t code)
 {
     ui_settings_state_t *st = &p->st;
+    if(st->view == UI_SETTINGS_VIEW_FACTORY_PASSWORD) return password_key(p, code);
     unsigned i = st->factory_index, count = factory_count(p);
-    bool password = st->view == UI_SETTINGS_VIEW_FACTORY_PASSWORD;
-    bool digits = password || st->view == UI_SETTINGS_VIEW_FACTORY_ODO;
-    unsigned n = password ? 4 : 6;
-    if(st->view != UI_SETTINGS_VIEW_LANGUAGE && !password && !st->factory_unlocked) {
-        st->view = UI_SETTINGS_VIEW_FACTORY_PASSWORD;
-        st->factory_index = 0;
+    bool digits = st->view == UI_SETTINGS_VIEW_FACTORY_ODO;
+    unsigned n = 6;
+    if(st->view != UI_SETTINGS_VIEW_LANGUAGE && !st->factory_unlocked) {
+        password_enter(p);
         return true;
     }
     if(code == UI_KEY_UP || code == UI_KEY_DOWN) {
@@ -118,17 +115,13 @@ static bool factory_key(ui_settings_page_t *p, uint8_t code)
     else if(digits) {
         if(i < n) st->factory_index++;
         else if(i == n + 1) {
-            st->view = password ? UI_SETTINGS_VIEW_SYSTEM : UI_SETTINGS_VIEW_FACTORY;
+            st->view = UI_SETTINGS_VIEW_FACTORY;
             st->factory_index = 0;
         }
         else {
             uint32_t value = 0;
             for(unsigned d = 0; d < n; ++d) value = value * 10 + st->factory_digits[d];
-            if(password) {
-                st->factory_error = value != 1688;
-                if(!st->factory_error) { st->factory_unlocked = true; st->view = UI_SETTINGS_VIEW_FACTORY; st->factory_index = 0; }
-            }
-            else if(s_cmd_cb && car_cmd_set_mileage(&cmd, value)) {
+            if(s_cmd_cb && car_cmd_set_mileage(&cmd, value)) {
                 s_cmd_cb(&cmd);
                 st->view = UI_SETTINGS_VIEW_FACTORY;
                 st->factory_index = 0;

@@ -580,6 +580,16 @@ bool ui_app_settings_back(void)
     return true;
 }
 
+bool ui_app_settings_dismiss_readonly(void)
+{
+    if(!ui_app_settings_visible() ||
+       !ui_settings_page_dismiss_readonly(&s_settings_page)) {
+        return false;
+    }
+    settings_tick_restart();
+    return true;
+}
+
 /* Qt setNextOrBackIndex：根页按索引前进，子页等同上/下选择 */
 void ui_app_settings_next_or_back(void)
 {

@@ -5,6 +5,7 @@
 
 #include "ui/ui_i18n.h"
 #include "ui/ui_theme.h"
+#include "ui/settings/ui_settings_language.h"
 
 int g_checks;
 int g_failures;
@@ -179,6 +180,44 @@ static void test_warning_texts(lv_obj_t *parent)
     lv_obj_delete(box);
 }
 
+static void test_settings_catalogs(lv_obj_t *parent)
+{
+    for(ui_settings_text_id_t id = UI_TEXT_BACK; id < UI_TEXT_COUNT; ++id) {
+        CHECK(ui_settings_text_get(id, 1U)[0] != '\0');
+        CHECK(ui_settings_text_get(id, 0U)[0] != '\0');
+        /* No French catalog yet: its stable language ID must fall back. */
+        CHECK(strcmp(ui_settings_text_get(id, 8U), ui_settings_text_get(id, 1U)) == 0);
+    }
+    CHECK(strcmp(ui_settings_text_get(UI_TEXT_COUNT, 0U), "") == 0);
+    CHECK(strcmp(ui_settings_text_get((ui_settings_text_id_t)-1, 0U), "") == 0);
+    lv_obj_t *box = lv_obj_create(parent);
+    lv_obj_t *label = make_label(box, "", ui_font_get(UI_TYPE_TEXT, 26U, false));
+    const uint8_t languages[] = {1U, 0U, 8U, 255U, 0U, 1U};
+    for(size_t i = 0; i < sizeof(languages); ++i) {
+        uint8_t language = languages[i];
+        ui_settings_label_set_id(label, UI_TEXT_PARK_VOLUME, language);
+        CHECK(strcmp(text_of(label), language == 0U ? "雷达音量" : "Radar Vol") == 0);
+        CHECK(ui_font_pixels(font_of(label)) == (language == 0U ? 26U : 22U));
+        ui_settings_translate(box, language);
+        CHECK(strcmp(text_of(label), language == 0U ? "雷达音量" : "Radar Vol") == 0);
+    }
+    /* A source-text page can reuse a previously keyed label (notably titles). */
+    ui_settings_label_set_text(label, "VERSION INFO");
+    ui_settings_translate(box, 0U);
+    CHECK(strcmp(text_of(label), "版本信息") == 0);
+    ui_settings_label_set_text(label, "");
+    ui_settings_translate(box, 1U);
+    CHECK(strcmp(text_of(label), "") == 0);
+    ui_settings_label_set_id(label, UI_TEXT_EPS_MODE, 0U);
+    lv_obj_add_flag(box, LV_OBJ_FLAG_HIDDEN);
+    ui_settings_translate(box, 1U);
+    CHECK(strcmp(text_of(label), "电动助力转向") == 0);
+    lv_obj_remove_flag(box, LV_OBJ_FLAG_HIDDEN);
+    ui_settings_translate(box, 1U);
+    CHECK(strcmp(text_of(label), "EPS") == 0);
+    lv_obj_delete(box);
+}
+
 int main(void)
 {
     lv_init();
@@ -193,6 +232,7 @@ int main(void)
     test_translate(lv_screen_active());
     test_warning_texts(lv_screen_active());
     test_unchanged_labels(lv_screen_active());
+    test_settings_catalogs(lv_screen_active());
 
     lv_display_delete(display);
     lv_deinit();

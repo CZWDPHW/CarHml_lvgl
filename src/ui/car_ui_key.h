@@ -14,6 +14,7 @@
  *     26 nextOrBack：设置页可见时按 Qt setNextOrBackIndex 前进
  *     31 切换表盘样式（设置页可见时屏蔽）
  *   Qt 侧不去重：按住持续上报短按时每帧都执行一次。
+ *   版本信息/ECO 历史详情：任意短按或长按返回上一层，释放不退出。
  */
 #ifndef CARMW_CAR_UI_KEY_H
 #define CARMW_CAR_UI_KEY_H

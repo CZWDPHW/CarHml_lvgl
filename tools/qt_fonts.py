@@ -90,6 +90,7 @@ def main():
     parser.add_argument('--converter', type=Path, required=True)
     parser.add_argument('--arial-dir', type=Path, default=Path('C:/Windows/Fonts'))
     parser.add_argument('--node', default='node')
+    parser.add_argument('--only', nargs='+', help='Regenerate only these font names; retain other manifest entries')
     args = parser.parse_args()
     dest = ROOT / 'src/ui/fonts'
     cache = ROOT / '.cache/qt-fonts'
@@ -101,6 +102,7 @@ def main():
     geely = cache / 'Geely_Bold.ttf'
     sanitize_geely(args.qt_font_dir / 'Geely_Bold.ttf', geely)
     translation_sources = [ROOT / 'src/ui/ui_i18n.c', ROOT / 'src/ui/settings/ui_settings_language.c']
+    translation_sources += sorted((ROOT / 'src/ui/settings/translations').glob('*.h'))
     symbols = ''.join(sorted(set('℃℉°−–…×％：，。（）') | {
         c for source in translation_sources for c in source.read_text(encoding='utf-8') if ord(c) > 127}))
     medium = ROOT / 'third_party/lvgl/scripts/built_in_font/Montserrat-Medium.ttf'
@@ -116,11 +118,19 @@ def main():
     specs += [('bebas', size, weight, args.qt_font_dir / 'Bebas.ttf', False, weight)
               for size, weight in ((28, False), (36, True))]
     specs += [('arial', size, weight, args.arial_dir / ('arialbd.ttf' if weight else 'arial.ttf'), True, False)
-              for size, weight in ((24, False), (24, True))]
+              for size, weight in ((20, False), (22, False), (24, False), (24, True), (28, False))]
+    previous = {font['name']: font for font in json.loads((dest / 'manifest.json').read_text(
+        encoding='utf-8'))['fonts']} if args.only else {}
     entries, manifest = [], []
     for family, size, weight, source, chinese, synthetic in specs:
         name = f'ui_qt_{family}_{size}' + ('_bold' if weight else '')
         output = dest / f'{name}.c'
+        if args.only and name not in args.only:
+            if not output.exists() or name not in previous:
+                raise ValueError(f'Missing retained font: {name}')
+            entries.append((family.upper(), size, weight, name))
+            manifest.append(previous[name])
+            continue
         cmd = [args.node, str(ROOT / 'tools/font_convert.cjs'), str(args.converter),
                'bold' if synthetic else ('cjk-bold' if chinese and weight else 'regular'),
                '--size', str(size), '--bpp', '4', '--format', 'lvgl',

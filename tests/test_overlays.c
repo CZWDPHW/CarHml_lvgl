@@ -394,6 +394,34 @@ static void test_system_version_settings(void)
     CHECK(strcmp(lv_label_get_text(page.version_updated), "---") == 0);
     CHECK(ui_settings_page_back(&page));
     CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+    CHECK(lv_label_get_text(page.title)[0] == '\0');
+    {
+        car_settings_t settings;
+        const uint8_t languages[] = {0U, 1U, 0U, 1U};
+        const uint8_t keys[] = {UI_KEY_UP, UI_KEY_DOWN, UI_KEY_LEFT, UI_KEY_RIGHT, UI_KEY_OK};
+        car_settings_reset(&settings);
+        ui_settings_page_set_settings(&settings);
+        for(size_t i = 0; i < sizeof(languages) / sizeof(languages[0]); ++i) {
+            settings.values.language = languages[i];
+            for(size_t j = 0; j < sizeof(keys) / sizeof(keys[0]); ++j) {
+                key.code = UI_KEY_OK;
+                CHECK(ui_settings_page_key(&page, &key));
+                CHECK(page.st.view == UI_SETTINGS_VIEW_VERSION);
+                CHECK(strcmp(lv_label_get_text(page.title), languages[i] == 0U ?
+                             "版本信息" : "VERSION INFO") == 0);
+                key.code = keys[j];
+                CHECK(ui_settings_page_key(&page, &key));
+                CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM);
+                CHECK(lv_label_get_text(page.title)[0] == '\0');
+                CHECK(!lv_obj_has_flag(page.system_list, LV_OBJ_FLAG_HIDDEN));
+                CHECK(lv_obj_has_flag(page.version_list, LV_OBJ_FLAG_HIDDEN));
+                /* Repeated refresh and language changes must not restore it. */
+                ui_settings_page_apply(&page);
+                CHECK(lv_label_get_text(page.title)[0] == '\0');
+            }
+        }
+        ui_settings_page_set_settings(NULL);
+    }
     CHECK(ui_settings_page_back(&page));
     CHECK(page.st.view == UI_SETTINGS_VIEW_ROOT);
     ui_settings_page_destroy(&page);
@@ -2358,6 +2386,148 @@ static void test_right_hand_drive(void)
     ui_app_deinit();
 }
 
+static car_cmd_t s_model_command;
+static unsigned s_model_command_count;
+
+static void capture_model_command(const car_cmd_t *command)
+{
+    s_model_command = *command;
+    ++s_model_command_count;
+}
+
+/* Model navigation must follow visibility; MCU values change only on readback. */
+static void test_settings_models(void)
+{
+    ui_settings_page_t page = {0};
+    car_settings_t settings;
+    car_settings_reset(&settings);
+    settings.values.factory_features = 0U;
+    settings.values.language = 1U;
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_set_cmd_cb(capture_model_command);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    ui_key_event_t key = {.pressed = 1, .code = UI_KEY_DOWN};
+    uint8_t itinerary_selection;
+
+    const lv_obj_t *lists[] = {page.it_list, page.assist_list, page.eps_list,
+        page.parking_list, page.chassis_list, page.drv_assist_list, page.drv_list,
+        page.eco_list, page.turn_list, page.wiper_list};
+    for(unsigned m = 0; m < UI_SETTINGS_MENU_COUNT; ++m) {
+        const ui_settings_menu_t *menu = ui_settings_menu_get((ui_settings_menu_id_t)m);
+        CHECK(lv_obj_get_child_count(lists[m]) == menu->count);
+        for(uint8_t row = 0; row < menu->count; ++row)
+            CHECK(ui_settings_menu_index((ui_settings_menu_id_t)m, menu->items[row]) == row);
+    }
+    CHECK(ui_settings_menu_get(UI_SETTINGS_MENU_COUNT) == NULL);
+    CHECK(ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_IT_ASSIST) == UI_SETTINGS_MENU_INDEX_NONE);
+
+    page.st.view = UI_SETTINGS_VIEW_ROOT;
+    page.st.root_locked = true;
+    page.st.root_index = UI_SETTINGS_ROOT_ITINERARY;
+    page.st.it_index = 0xFFU;
+    CHECK(ui_settings_page_key(&page, &key));
+    itinerary_selection = page.st.it_index;
+    CHECK(itinerary_selection < ui_settings_menu_get(UI_SETTINGS_MENU_ITINERARY)->count);
+    CHECK(lv_label_get_text(lv_obj_get_child(page.it_rows[itinerary_selection], 0))[0] != '\0');
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view != UI_SETTINGS_VIEW_ROOT);
+    CHECK(ui_settings_page_back(&page));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_ROOT);
+    CHECK(page.st.it_index == itinerary_selection);
+
+    page.st.view = UI_SETTINGS_VIEW_DRIVING_ASSIST;
+    page.st.driving_assist_index = 0xFFU;
+    ui_settings_page_apply(&page);
+    CHECK(lv_obj_has_flag(page.drv_assist_rows[ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_ASSIST, UI_SETTINGS_DA_EMERGENCY)], LV_OBJ_FLAG_HIDDEN));
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.driving_assist_index == ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_ASSIST, UI_SETTINGS_DA_LANE));
+    settings.values.factory_features |= 1U << 8;
+    page.st.driving_assist_index = 0xFFU;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.driving_assist_index == ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_ASSIST, UI_SETTINGS_DA_EMERGENCY));
+
+    page.st.view = UI_SETTINGS_VIEW_PARKING;
+    page.st.parking_index = ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_DISPLAY);
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.parking_index == ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_VOLUME));
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.parking_index == ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_DISPLAY));
+
+    car_parking_chassis_t pc = {.radar_volume = 2U};
+    ui_settings_page_set_parking_chassis(&page, &pc);
+    page.st.parking_index = ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_VOLUME);
+    key.code = UI_KEY_OK;
+    s_model_command_count = 0;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_model_command_count == 1U);
+    CHECK(s_model_command.cmd_id == 0x16U && s_model_command.op == CAR_OP_SET_GET);
+    CHECK(s_model_command.len == 3U && s_model_command.payload[0] == 0x86U);
+    CHECK(s_model_command.payload[1] == 17U && s_model_command.payload[2] == 0U);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.parking_rows[ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_VOLUME)], 1)), "High") == 0);
+    pc.radar_volume = 0;
+    ui_settings_page_set_parking_chassis(&page, &pc);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.parking_rows[ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_VOLUME)], 1)), "Low") == 0);
+    settings.values.language = 0U;
+    ui_settings_page_apply(&page);
+    pc.radar_volume = 1U;
+    ui_settings_page_set_parking_chassis(&page, &pc);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.parking_rows[ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_VOLUME)], 1)), "中") == 0);
+    settings.values.language = 1U;
+    ui_settings_page_apply(&page);
+    page.st.parking_index = ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_REAR_CROSS);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(s_model_command_count == 1U);
+
+    page.st.view = UI_SETTINGS_VIEW_DRIVING_INFO;
+    page.st.drv_index = 0xFFU;
+    settings.values.gear_on = 1U;
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.drv_index == ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_INFO, UI_SETTINGS_DRV_OUT_TEMP));
+    page.st.drv_index = ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_INFO, UI_SETTINGS_DRV_GEAR);
+    key.code = UI_KEY_OK;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(settings.values.gear_on == 0U && s_model_command_count == 1U);
+    page.st.root_index = UI_SETTINGS_ROOT_INFO;
+    page.st.drv_index = ui_settings_menu_index(UI_SETTINGS_MENU_DRIVING_INFO, UI_SETTINGS_ITEM_BACK);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_ROOT && page.st.root_locked);
+    CHECK(page.st.info_index == UI_SETTINGS_INFO_DRIVING);
+    CHECK(!lv_obj_has_flag(page.info_list, LV_OBJ_FLAG_HIDDEN));
+
+    struct {ui_settings_view_t view; uint8_t *index; uint8_t count; ui_settings_view_t parent;} pages[] = {
+        {UI_SETTINGS_VIEW_EPS, &page.st.eps_index, ui_settings_menu_get(UI_SETTINGS_MENU_EPS)->count, UI_SETTINGS_VIEW_ITINERARY_ASSIST},
+        {UI_SETTINGS_VIEW_PARKING, &page.st.parking_index, ui_settings_menu_get(UI_SETTINGS_MENU_PARKING)->count, UI_SETTINGS_VIEW_ITINERARY_ASSIST},
+        {UI_SETTINGS_VIEW_CHASSIS, &page.st.chassis_index, ui_settings_menu_get(UI_SETTINGS_MENU_CHASSIS)->count, UI_SETTINGS_VIEW_ITINERARY_ASSIST},
+        {UI_SETTINGS_VIEW_DRIVING_ASSIST, &page.st.driving_assist_index, ui_settings_menu_get(UI_SETTINGS_MENU_DRIVING_ASSIST)->count, UI_SETTINGS_VIEW_ITINERARY_ASSIST},
+        {UI_SETTINGS_VIEW_ECO, &page.st.eco_index, ui_settings_menu_get(UI_SETTINGS_MENU_ECO)->count, UI_SETTINGS_VIEW_MY_CAR},
+        {UI_SETTINGS_VIEW_TURN, &page.st.turn_index, ui_settings_menu_get(UI_SETTINGS_MENU_TURN)->count, UI_SETTINGS_VIEW_VEHICLE},
+        {UI_SETTINGS_VIEW_WIPER, &page.st.wiper_index, ui_settings_menu_get(UI_SETTINGS_MENU_WIPER)->count, UI_SETTINGS_VIEW_VEHICLE},
+    };
+    for(size_t i = 0; i < sizeof(pages) / sizeof(pages[0]); ++i) {
+        page.st.view = pages[i].view;
+        *pages[i].index = 0xFFU;
+        key.code = UI_KEY_UP;
+        CHECK(ui_settings_page_key(&page, &key));
+        CHECK(*pages[i].index == pages[i].count - 1U);
+        key.code = UI_KEY_OK;
+        CHECK(ui_settings_page_key(&page, &key));
+        CHECK(page.st.view == pages[i].parent);
+    }
+    CHECK(s_model_command_count == 1U);
+    ui_settings_page_destroy(&page);
+    CHECK(page.parking_rows == NULL && page.it_rows == NULL);
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_destroy(&page);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+    ui_settings_page_set_cmd_cb(NULL);
+}
+
 int main(void)
 {
     lv_init();
@@ -2385,6 +2555,7 @@ int main(void)
     test_warn_end_to_end(lv_screen_active());
     test_tire_style_switch();
     test_system_version_settings();
+    test_settings_models();
     test_overlay_composition();
     test_card_cycle();
     test_state_restore();

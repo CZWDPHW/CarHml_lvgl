@@ -22,6 +22,7 @@
 #include "ui/ui_app.h"
 #include "ui/ui_node.h"
 #include "ui/ui_style.h"
+#include "ui/ui_fonts.h"
 #include "ui/settings/ui_settings_page.h"
 
 #define CHECK(cond)                                                          \
@@ -125,6 +126,27 @@ static void root_move_to(uint8_t index)
         push_key(22U, 1U);
         (void)car_ui_key_dispatch(&s_link, &s_ctx);
     }
+}
+
+/* 首次锁定后焦点在第一个可选项；按菜单 ID 找车辆入口，避免写死按一次下键。 */
+static void enter_itinerary_vehicle(void)
+{
+    root_move_to(ROOT_ITINERARY_INDEX);
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    const ui_settings_menu_t *menu = ui_settings_menu_get(UI_SETTINGS_MENU_ITINERARY);
+    uint8_t target = ui_settings_menu_index(UI_SETTINGS_MENU_ITINERARY, UI_SETTINGS_IT_VEHICLE);
+    CHECK(target != UI_SETTINGS_MENU_INDEX_NONE);
+    if(target == UI_SETTINGS_MENU_INDEX_NONE) return;
+    bool first = true;
+    for(uint8_t row = 0; row <= target; ++row) {
+        if(menu->items[row] == UI_SETTINGS_IT_TRIP) continue;
+        if(first) { first = false; continue; }
+        push_key(20U, 1U);
+        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    }
+    push_key(23U, 1U);
+    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
 }
 
 /* 根页选中“我的座驾”并进入（Qt 第一次 OK 只是进入分类，焦点落在第一项） */
@@ -565,74 +587,67 @@ static void test_settings_general_eco(void)
     teardown_forester();
 }
 
-/* ECO 历史信息：进入即显示 4 条历史柱，OK 把“当前”平均油耗推入并落盘 */
+/* 只读详情：真实方向盘帧的任意短按/长按只返回一级，释放不退出。 */
 static void test_eco_history_page(void)
 {
-    car_settings_t snapshot;
-    uint64_t version;
-    uint16_t last;
-    car_state_t st;
-    car_state_view_t view;
+    const uint8_t keys[] = {13U, 19U, 20U, 21U, 22U, 23U, 26U, 31U, 0x25U};
 
-    setup_forester();
+    for(unsigned version_page = 0; version_page < 2; ++version_page) {
+        setup_forester();
+        car_state_view_t view = {0};
+        car_state_init(&view.state);
+        view.has_data = true;
+        view.state.trip.valid = true;
+        view.state.trip.avg_fuel_x10 = 123U;
+        ui_app_apply(&view);
+        ui_app_settings_open();
+        if(version_page) {
+            root_move_to(UI_SETTINGS_ROOT_SYSTEM);
+            push_key(23U, 1U);
+            (void)car_ui_key_dispatch(&s_link, &s_ctx);
+            for(unsigned i = 0; i <= UI_SETTINGS_SYSTEM_VERSION; ++i) {
+                push_key(20U, 1U);
+                (void)car_ui_key_dispatch(&s_link, &s_ctx);
+            }
+        }
+        else {
+            enter_mycar();
+            mycar_move_to(MYCAR_STYLE_INDEX, MYCAR_ECO_HISTORY_INDEX);
+        }
+        lv_obj_t *body = lv_obj_get_child(ui_app_settings_root(), 2);
+        int parent_index = visible_card_index(body);
+        CHECK(parent_index >= 0);
+        push_key(23U, 1U);
+        (void)car_ui_key_dispatch(&s_link, &s_ctx);
+        int detail_index = visible_card_index(body);
+        CHECK(detail_index >= 0 && detail_index != parent_index);
+        const ui_style_desc_t *style = ui_app_current_style();
+        car_settings_t before = s_settings;
+        CHECK(!car_settings_dirty(&s_settings));
 
-    /* 绑定落盘路径（setup 只 reset，未 load）；先删残留文件避免读到上次用例 */
-    (void)unlink("/tmp/carmw_eco_hist_test.cfg");
-    CHECK(car_settings_load(&s_settings, "/tmp/carmw_eco_hist_test.cfg"));
-
-    car_state_init(&st);
-    st.trip.valid = true;
-    st.trip.avg_fuel_x10 = 123U;
-    memset(&view, 0, sizeof(view));
-    view.has_data = true;
-    view.state = st;
-    ui_app_apply(&view);
-
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    CHECK(ui_app_settings_is_open());
-
-    enter_mycar();
-    mycar_move_to(MYCAR_STYLE_INDEX, MYCAR_ECO_HISTORY_INDEX);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    CHECK(ui_app_settings_is_open());
-
-    /* 历史柱取自持久设置（初值 9.0 / 10.5 / 8.0 / 9.2） */
-    CHECK(s_settings.values.eco_history_x10[0] == 90U);
-    CHECK(s_settings.values.eco_history_x10[3] == 92U);
-
-    /* 单卡片页面：上下键无副作用 */
-    {
-        uint16_t before0 = s_settings.values.eco_history_x10[0];
-
-        push_key(20U, 1U);
-        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-        push_key(19U, 1U);
-        CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-        CHECK(s_settings.values.eco_history_x10[0] == before0);
+        for(uint8_t pressed = 1U; pressed <= 2U; ++pressed) {
+            for(size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
+                push_key(keys[i], 0U);
+                CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+                CHECK(visible_card_index(body) == detail_index);
+                push_key(keys[i], pressed);
+                CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+                CHECK(ui_app_settings_is_open());
+                CHECK(visible_card_index(body) == parent_index);
+                CHECK(lv_label_get_text(lv_obj_get_child(ui_app_settings_root(), 0))[0] == '\0');
+                CHECK(ui_app_current_style() == style);
+                CHECK(visible_card_index(s_stack) == 0);
+                CHECK(!s_ctx.nav_home && !s_ctx.style_switch);
+                CHECK(memcmp(&s_settings.values, &before.values, sizeof(before.values)) == 0);
+                CHECK(!car_settings_dirty(&s_settings));
+                /* 再按确认回到同一详情，验证焦点未被退出按键继续移动。 */
+                push_key(23U, 1U);
+                CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+                CHECK(visible_card_index(body) == detail_index);
+            }
+        }
+        teardown_forester();
     }
-
-    /* OK = 记录当前平均油耗（12.3），最旧一条被丢弃 */
-    last = s_settings.values.eco_history_x10[3];
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    CHECK(s_settings.values.eco_history_x10[3] == 123U);
-    CHECK(s_settings.values.eco_history_x10[2] == last);
-    CHECK(s_settings.values.eco_history_x10[0] == 105U); /* 满 4 条只丢最旧一条 */
-    CHECK(car_settings_dirty(&s_settings));
-
-    version = car_settings_snapshot(&s_settings, &snapshot);
-    CHECK(car_settings_save(&snapshot, version, &s_settings));
-    CHECK(!car_settings_dirty(&s_settings));
-    (void)unlink("/tmp/carmw_eco_hist_test.cfg");
-
-    /* 返回键回到我的座驾列表 */
-    push_key(20U, 1U); /* 返回 */
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    CHECK(ui_app_settings_is_open());
-
-    teardown_forester();
 }
 
 /* 长按 19/20 在 Qt 中映射为左/右，同样翻卡 */
@@ -798,16 +813,8 @@ static void test_settings_vehicle_light(void)
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
     CHECK(ui_app_settings_is_open());
 
-    /* 根页右移到“行程资讯”并锁定，焦点落在 DRIVING ASSIST */
-    root_move_to(ROOT_ITINERARY_INDEX);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-
-    /* 下移到 VEHICLE，进入车辆设置 */
-    push_key(20U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    /* 行程资讯 → 车辆设置，入口位置由菜单决定。 */
+    enter_itinerary_vehicle();
     CHECK(ui_app_settings_is_open());
 
     /* 首次 OK 选中 LIGHT SETTINGS，再 OK 进入灯光设置 */
@@ -878,13 +885,7 @@ static void test_settings_vehicle_turn_wiper(void)
 
     push_key(23U, 1U);
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    root_move_to(ROOT_ITINERARY_INDEX);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(20U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    enter_itinerary_vehicle();
 
     /* 选中 LIGHT SETTINGS 后下移到 TURN LIGHT，进入转向灯 */
     push_key(23U, 1U);
@@ -953,13 +954,7 @@ static void test_settings_vehicle_service(void)
 
     push_key(23U, 1U);
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    root_move_to(ROOT_ITINERARY_INDEX);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(20U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    enter_itinerary_vehicle();
 
     /* LIGHT -> TURN -> DOORS -> WIPER -> SERVICE */
     push_key(23U, 1U);
@@ -1039,13 +1034,7 @@ static void test_settings_vehicle_gated(void)
 
     push_key(23U, 1U);
     CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    root_move_to(ROOT_ITINERARY_INDEX);
-    push_key(23U, 1U);
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(20U, 1U); /* VEHICLE */
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
-    push_key(23U, 1U); /* 进入车辆设置 */
-    CHECK(car_ui_key_dispatch(&s_link, &s_ctx) == 1U);
+    enter_itinerary_vehicle();
 
     /* 回读值：灵敏度 FAST(2)、延时 90s(5)、远程启动 ON，其余默认 OFF */
     memset(&vs, 0, sizeof(vs));
@@ -1765,6 +1754,112 @@ static void test_language_factory(void)
     ui_settings_page_set_settings(NULL);
 }
 
+static void test_factory_password_wheels(void)
+{
+    ui_settings_page_t page;
+    car_settings_t settings;
+    car_settings_reset(&settings);
+    settings.values.language = 1U;
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_set_cmd_cb(capture_cmd);
+    s_cmd_count = 0U;
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    page.st.view = UI_SETTINGS_VIEW_SYSTEM;
+    page.st.system_index = 3U;
+    ui_key_event_t key = {.pressed = 1U, .code = UI_KEY_OK};
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD);
+    CHECK(!lv_obj_has_flag(page.password_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(lv_obj_has_flag(page.factory_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(strcmp(lv_label_get_text(page.title), "FACTORY SETTINGS") == 0);
+    lv_obj_update_layout(page.root);
+    CHECK(lv_obj_get_x(page.password_bg) == 64 && lv_obj_get_y(page.password_bg) == 0);
+    lv_image_header_t header;
+    CHECK(lv_image_decoder_get_info(lv_image_get_src(page.password_bg), &header) == LV_RESULT_OK);
+    CHECK(header.w == 466 && header.h == 190);
+    for(unsigned col = 0; col < 4U; ++col) {
+        lv_obj_t *roller = page.password_rollers[col];
+        CHECK(lv_roller_get_selected(roller) == 0U);
+        CHECK(lv_roller_get_option_count(roller) == 10U);
+        CHECK(lv_obj_get_width(roller) == 90 && lv_obj_get_height(roller) == 100);
+        CHECK(lv_obj_get_x(roller) == 4 + 92 * (int32_t)col && lv_obj_get_y(roller) == 45);
+        CHECK(lv_obj_get_style_text_font(roller, LV_PART_MAIN) == UI_TEXT_BOLD(28));
+        CHECK(lv_color_eq(lv_obj_get_style_text_color(roller, LV_PART_SELECTED),
+                          lv_color_hex(col == 0U ? 0xFF0000 : 0xFFFFFF)));
+    }
+    /* Translation must not shorten the roller's repeated internal option buffer. */
+    size_t option_length = strlen(lv_roller_get_options(page.password_rollers[0]));
+    for(unsigned language = 0; language < 2U; ++language) {
+        settings.values.language = language;
+        ui_settings_page_apply(&page);
+        CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.password_back, 0)),
+                     language ? "Go back" : "返回") == 0);
+        CHECK(strlen(lv_roller_get_options(page.password_rollers[0])) == option_length);
+        CHECK(lv_obj_get_style_text_font(page.password_rollers[0], LV_PART_MAIN) == UI_TEXT_BOLD(28));
+    }
+    key.code = UI_KEY_DOWN;
+    key.pressed = 0U;
+    CHECK(!ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_digits[0] == 0U);
+    key.pressed = 1U;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_digits[0] == 9U && lv_roller_get_selected(page.password_rollers[0]) == 9U);
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_digits[0] == 0U);
+    key.code = UI_KEY_LEFT;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_digits[0] == 9U);
+    key.code = UI_KEY_RIGHT;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_digits[0] == 0U);
+    key.code = UI_KEY_OK;
+    for(unsigned i = 0; i < 4U; ++i) CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_index == 4U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_error && !page.st.factory_unlocked && s_cmd_count == 0U);
+    CHECK(page.st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD);
+    CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.password_ok, 0)), "OK") == 0);
+    key.code = UI_KEY_UP;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_index == 5U && page.st.factory_child_back);
+    CHECK(lv_color_eq(lv_obj_get_style_text_color(lv_obj_get_child(page.password_back, 0), 0), lv_color_hex(0xFF0000)));
+    key.code = UI_KEY_DOWN;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_index == 4U);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_index == 3U);
+    key.code = UI_KEY_OK;
+    for(unsigned i = 0; i < 3U; ++i) CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_index == 0U && !page.st.factory_child_back);
+    page.st.factory_index = 5U;
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_SYSTEM && !page.st.factory_unlocked);
+    CHECK(lv_obj_has_flag(page.password_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(strcmp(lv_label_get_text(page.title), "") == 0);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD && page.st.factory_index == 0U);
+    CHECK(!page.st.factory_error && !page.st.factory_child_back);
+    /* Enter 1688 through the same keys used by the steering dispatcher. */
+    const uint8_t steps[] = {1U, 6U, 2U, 2U};
+    for(unsigned col = 0; col < 4U; ++col) {
+        key.code = col < 2U ? UI_KEY_UP : UI_KEY_DOWN;
+        for(unsigned i = 0; i < steps[col]; ++i) CHECK(ui_settings_page_key(&page, &key));
+        key.code = UI_KEY_OK;
+        CHECK(ui_settings_page_key(&page, &key));
+    }
+    CHECK(page.st.factory_index == 4U && !page.st.factory_unlocked);
+    CHECK(ui_settings_page_key(&page, &key));
+    CHECK(page.st.factory_unlocked && page.st.view == UI_SETTINGS_VIEW_FACTORY);
+    CHECK(lv_obj_has_flag(page.password_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(!lv_obj_has_flag(page.factory_list, LV_OBJ_FLAG_HIDDEN));
+    CHECK(s_cmd_count == 0U);
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+    ui_settings_page_set_cmd_cb(NULL);
+}
+
 static void check_visible_text(lv_obj_t *label)
 {
     lv_area_t visible;
@@ -1899,6 +1994,7 @@ int main(void)
     test_date_wheel();
     test_date_language();
     test_language_factory();
+    test_factory_password_wheels();
     test_settings_visible_geometry();
 
     printf("steering_key: %d checks, %d failures\n", g_checks, g_failures);

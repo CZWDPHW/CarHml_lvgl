@@ -187,68 +187,12 @@ static const char *const s_info_labels[UI_SETTINGS_INFO_COUNT] = {
     "DRIVING INFO", "BACK",
 };
 
-/* 行车信息：行序与 Qt PageSettingDrivingInfo.leftModel 一致 */
-static const char *const s_drv_labels[UI_SETTINGS_DRV_COUNT] = {
-    "OUTSIDE TEMP ", "GEAR ", "AVG FUEL ", "BACK",
-};
-
 /* 常规设置：行序与 Qt PageGeneralSettings.itemIndex 一致 */
 static const char *const s_routine_labels[UI_SETTINGS_ROUTINE_COUNT] = {
     "DAY LIGHT ", "NIGHT LIGHT ", "SPEED LIMIT ", "SPEED WARN ", "BACK",
 };
 
-/* ECO 设置：Qt EcoSettings 的“显示”与“ECO 指示” */
-static const char *const s_eco_labels[UI_SETTINGS_ECO_COUNT] = {
-    "ECO DISPLAY ", "ECO INDICATOR ", "BACK",
-};
-
-/* 行程资讯子项：行程资讯未迁移，置灰 */
-static const char *const s_it_labels[UI_SETTINGS_IT_COUNT] = {
-    "ITINERARY", "DRIVING ASSIST", "VEHICLE", "BACK",
-};
-static const bool s_it_enabled[UI_SETTINGS_IT_COUNT] = {
-    false, true, true, true,
-};
-
-/* 驾驶员辅助子项：驾驶辅助 / 驻车辅助 / 底盘控制 / 电动助力转向 / 返回 */
-static const char *const s_assist_labels[UI_SETTINGS_ASSIST_COUNT] = {
-    "DRIVING ASSIST", "PARKING ASSIST", "CHASSIS CONTROL",
-    "ELECTRIC POWER STEERING", "BACK",
-};
-static const bool s_assist_enabled[UI_SETTINGS_ASSIST_COUNT] = {
-    true, true, true, true, true,
-};
-
-/*
- * 驻车辅助（Qt ParkAssist 的 leftModel 顺序）。前方雷达/倒车雷达/显示/
- * 雷达音量/雷达探测距离在 XTrail 车型隐藏（未纳入车型分支，恒显示）；
- * 倒车侧预警按工厂开关 bit9 隐藏；驻车辅助传感器仅 Infiniti/X21 车型。
- */
-static const char *const s_park_labels[UI_SETTINGS_PARK_COUNT] = {
-    "MOVING OBJECT ", "FRONT RADAR ", "REAR RADAR ", "DISPLAY ",
-    "REAR CROSS TRAFFIC ", "RADAR VOLUME ", "RADAR DISTANCE ",
-    "PARKING SENSOR ", "BACK",
-};
-
-/* 底盘控制（Qt ChassistControl） */
-static const char *const s_chassis_labels[UI_SETTINGS_CHASSIS_COUNT] = {
-    "ACTIVE TRACE CONTROL ", "ACTIVE ENGINE BRAKE ", "BACK",
-};
-
-/* Qt ParkAssist：雷达音量 低/中/高，雷达探测距离 近/中/远，传感器 OFF/ON/仅前方 */
-static const char *const s_radar_volume_options[3] = { "LOW", "MID", "HIGH" };
-static const char *const s_radar_distance_options[3] = { "NEAR", "MID", "FAR" };
-static const char *const s_parking_sensor_options[3] = { "OFF", "ON", "FRONT ONLY" };
-
-/* 电动助力转向（Qt ElectricPowerStepping）：常规 / 运动 */
-static const char *const s_eps_labels[UI_SETTINGS_EPS_COUNT] = {
-    "ELECTRIC POWER STEERING ", "BACK",
-};
-
-/* 驾驶辅助三项：值来自 MCU 0x16 回读，OK 只下发命令 */
-static const char *const s_da_labels[UI_SETTINGS_DA_COUNT] = {
-    "EMERGENCY BRAKING ", "LANE DEPARTURE ", "BLIND SPOT ", "BACK",
-};
+/* 常用设置的选项定义见 models 目录；不在这里维护重复的文字数组。 */
 
 /* 车辆设置子项（Qt CarSettings.leftModel 顺序） */
 static const char *const s_veh_labels[UI_SETTINGS_VEH_COUNT] = {
@@ -286,16 +230,6 @@ static const char *const s_light_delay_options[8] = {
 /* Qt DoorSetting.autolockkkkk 的 3 个选项 */
 static const char *const s_auto_lock_options[3] = {
     "SPEED", "P SHIFT", "OFF",
-};
-
-/* 转向灯（Qt TurnLightSet） */
-static const char *const s_turn_labels[UI_SETTINGS_TURN_COUNT] = {
-    "LANE CHANGE FLASH ", "BACK",
-};
-
-/* 雨刷器（Qt WiperSet） */
-static const char *const s_wiper_labels[UI_SETTINGS_WIPER_COUNT] = {
-    "SPEED SENSING WIPER ", "REAR WIPER LINKAGE ", "MIST MODE ", "BACK",
 };
 
 /* 保养设置主列表（Qt Service） */
@@ -361,6 +295,8 @@ static bool s_vs_remote_start = false;
 /* 保养公里数缓存（Qt SettingsManager 缺省：5000 / 10000 / 10000） */
 static uint32_t s_svc_set_km[3] = { 5000U, 10000U, 10000U };
 static int32_t s_svc_remain_km[3] = { 5000, 10000, 10000 };
+
+#include "ui_settings_model.inc"
 
 void ui_settings_state_init(ui_settings_state_t *st)
 {
@@ -639,7 +575,13 @@ static void row_style(lv_obj_t *row, bool selected, bool enabled)
         }
     }
     lv_label_long_mode_t mode = selected && visible ? LV_LABEL_LONG_MODE_SCROLL : LV_LABEL_LONG_MODE_DOTS;
-    if(lv_label_get_long_mode(label) != mode) lv_label_set_long_mode(label, mode);
+    if(lv_label_get_long_mode(label) != mode) {
+        /* DOTS rewrites the text buffer until explicitly restored. Restore it
+         * before SCROLL so the translator never caches a truncated source. */
+        if(lv_label_get_long_mode(label) == LV_LABEL_LONG_MODE_DOTS)
+            lv_label_set_text(label, NULL);
+        lv_label_set_long_mode(label, mode);
+    }
 }
 
 /*
@@ -798,38 +740,17 @@ static void info_page_style(ui_settings_page_t *page)
 
 static void drv_page_style(ui_settings_page_t *page)
 {
-    bool out_temp = (s_settings != NULL) && (s_settings->values.out_temperature != 0U);
-    bool gear = (s_settings == NULL) || (s_settings->values.gear_on != 0U);
-    bool avg_fuel = (s_settings != NULL) && (s_settings->values.avg_fuel_on != 0U);
-
-    switch_row_state(page->drv_rows[UI_SETTINGS_DRV_OUT_TEMP],
-                     page->st.drv_index == UI_SETTINGS_DRV_OUT_TEMP, out_temp);
-    switch_row_state(page->drv_rows[UI_SETTINGS_DRV_GEAR],
-                     page->st.drv_index == UI_SETTINGS_DRV_GEAR, gear);
-    switch_row_state(page->drv_rows[UI_SETTINGS_DRV_AVG_FUEL],
-                     page->st.drv_index == UI_SETTINGS_DRV_AVG_FUEL, avg_fuel);
-    row_style(page->drv_rows[UI_SETTINGS_DRV_BACK],
-              page->st.drv_index == UI_SETTINGS_DRV_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_DRIVING_INFO);
 }
 
-/* 行程资讯子项：只有驾驶员辅助与返回可用 */
 static void it_page_style(ui_settings_page_t *page)
 {
-    bool locked = page->st.root_locked;
-
-    for(uint8_t i = 0U; i < UI_SETTINGS_IT_COUNT; ++i) {
-        row_style(page->it_rows[i], locked && page->st.it_index == i,
-                  s_it_enabled[i]);
-    }
+    model_render(page, UI_SETTINGS_VIEW_ROOT);
 }
 
-/* 驾驶员辅助子项：只有驾驶辅助与返回可用 */
 static void assist_page_style(ui_settings_page_t *page)
 {
-    for(uint8_t i = 0U; i < UI_SETTINGS_ASSIST_COUNT; ++i) {
-        row_style(page->assist_rows[i], page->st.assist_index == i,
-                  s_assist_enabled[i]);
-    }
+    model_render(page, UI_SETTINGS_VIEW_ITINERARY_ASSIST);
 }
 
 /* 驾驶辅助三项：ON/OFF 只反映 MCU 回读，不在本地翻转 */
@@ -847,44 +768,18 @@ static void speed_warn_page_style(ui_settings_page_t *page)
 
 static void drv_assist_page_style(ui_settings_page_t *page)
 {
-    switch_row_state(page->drv_assist_rows[UI_SETTINGS_DA_EMERGENCY],
-                     page->st.driving_assist_index == UI_SETTINGS_DA_EMERGENCY,
-                     s_da_emergency);
-    switch_row_state(page->drv_assist_rows[UI_SETTINGS_DA_LANE],
-                     page->st.driving_assist_index == UI_SETTINGS_DA_LANE,
-                     s_da_lane);
-    switch_row_state(page->drv_assist_rows[UI_SETTINGS_DA_BLIND],
-                     page->st.driving_assist_index == UI_SETTINGS_DA_BLIND,
-                     s_da_blind);
-    row_style(page->drv_assist_rows[UI_SETTINGS_DA_BACK],
-              page->st.driving_assist_index == UI_SETTINGS_DA_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_DRIVING_ASSIST);
 }
 
-/* 电动助力转向：模式文字只反映 MCU 回读（0 常规 / 1 运动） */
 static void eps_page_style(ui_settings_page_t *page)
 {
-    lv_obj_t *row = page->eps_rows[UI_SETTINGS_EPS_MODE];
-    lv_obj_t *state = row != NULL ? lv_obj_get_child(row, 1) : NULL;
-
-    if(state != NULL) {
-        ui_settings_label_set_text(state, (s_eps_mode == 1U) ? "SPORT" : "NORMAL");
-    }
-    row_style(row, page->st.eps_index == UI_SETTINGS_EPS_MODE, true);
-    row_style(page->eps_rows[UI_SETTINGS_EPS_BACK],
-              page->st.eps_index == UI_SETTINGS_EPS_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_EPS);
 }
 
 /* 底盘控制：两项开关只反映 MCU 回读 */
 static void chassis_page_style(ui_settings_page_t *page)
 {
-    switch_row_state(page->chassis_rows[UI_SETTINGS_CHASSIS_TRACE],
-                     page->st.chassis_index == UI_SETTINGS_CHASSIS_TRACE,
-                     s_pc_trace);
-    switch_row_state(page->chassis_rows[UI_SETTINGS_CHASSIS_BRAKE],
-                     page->st.chassis_index == UI_SETTINGS_CHASSIS_BRAKE,
-                     s_pc_engine_brake);
-    row_style(page->chassis_rows[UI_SETTINGS_CHASSIS_BACK],
-              page->st.chassis_index == UI_SETTINGS_CHASSIS_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_CHASSIS);
 }
 
 /* 车辆设置：只有灯光设置/车门/返回可用，未迁移项置灰 */
@@ -1016,58 +911,19 @@ static void select_page_style(ui_settings_page_t *page)
 /* 转向灯：变更车道闪灯 3 次（0x16 index 12） */
 static void turn_page_style(ui_settings_page_t *page)
 {
-    switch_row_state(page->turn_rows[UI_SETTINGS_TURN_LANE_CHANGE],
-                     page->st.turn_index == UI_SETTINGS_TURN_LANE_CHANGE,
-                     s_vs_lane_change);
-    row_style(page->turn_rows[UI_SETTINGS_TURN_BACK],
-              page->st.turn_index == UI_SETTINGS_TURN_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_TURN);
 }
 
 /* 雨刷器：index 20 / 21 / 22 */
 static void wiper_page_style(ui_settings_page_t *page)
 {
-    switch_row_state(page->wiper_rows[UI_SETTINGS_WIPER_SPEED_SENSE],
-                     page->st.wiper_index == UI_SETTINGS_WIPER_SPEED_SENSE,
-                     s_vs_wiper_speed);
-    switch_row_state(page->wiper_rows[UI_SETTINGS_WIPER_REAR_LINKAGE],
-                     page->st.wiper_index == UI_SETTINGS_WIPER_REAR_LINKAGE,
-                     s_vs_wiper_rear);
-    switch_row_state(page->wiper_rows[UI_SETTINGS_WIPER_MIST],
-                     page->st.wiper_index == UI_SETTINGS_WIPER_MIST,
-                     s_vs_wiper_mist);
-    row_style(page->wiper_rows[UI_SETTINGS_WIPER_BACK],
-              page->st.wiper_index == UI_SETTINGS_WIPER_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_WIPER);
 }
 
 /* 驻车辅助：开关项 ON/OFF，音量/距离/传感器显示当前选项（只反映回读） */
 static void parking_page_style(ui_settings_page_t *page)
 {
-    switch_row_state(page->parking_rows[UI_SETTINGS_PARK_MOVING_OBJECT],
-                     page->st.parking_index == UI_SETTINGS_PARK_MOVING_OBJECT,
-                     s_pc_moving_object);
-    switch_row_state(page->parking_rows[UI_SETTINGS_PARK_FRONT_RADAR],
-                     page->st.parking_index == UI_SETTINGS_PARK_FRONT_RADAR,
-                     s_pc_front_radar);
-    switch_row_state(page->parking_rows[UI_SETTINGS_PARK_REAR_RADAR],
-                     page->st.parking_index == UI_SETTINGS_PARK_REAR_RADAR,
-                     s_pc_rear_radar);
-    switch_row_state(page->parking_rows[UI_SETTINGS_PARK_DISPLAY],
-                     page->st.parking_index == UI_SETTINGS_PARK_DISPLAY,
-                     s_pc_display);
-    switch_row_state(page->parking_rows[UI_SETTINGS_PARK_REAR_CROSS],
-                     page->st.parking_index == UI_SETTINGS_PARK_REAR_CROSS,
-                     s_pc_rear_cross);
-    detail_row_state(page->parking_rows[UI_SETTINGS_PARK_VOLUME],
-                     page->st.parking_index == UI_SETTINGS_PARK_VOLUME,
-                     s_radar_volume_options[s_pc_radar_volume % 3U]);
-    detail_row_state(page->parking_rows[UI_SETTINGS_PARK_DISTANCE],
-                     page->st.parking_index == UI_SETTINGS_PARK_DISTANCE,
-                     s_radar_distance_options[s_pc_radar_distance % 3U]);
-    detail_row_state(page->parking_rows[UI_SETTINGS_PARK_SENSOR],
-                     page->st.parking_index == UI_SETTINGS_PARK_SENSOR,
-                     s_parking_sensor_options[s_pc_parking_sensor % 3U]);
-    row_style(page->parking_rows[UI_SETTINGS_PARK_BACK],
-              page->st.parking_index == UI_SETTINGS_PARK_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_PARKING);
 }
 
 /* 保养主列表：机油 / 轮胎 / 自定义 / 返回 */
@@ -1190,22 +1046,7 @@ static void routine_page_style(ui_settings_page_t *page)
 
 static void eco_page_style(ui_settings_page_t *page)
 {
-    bool on = (s_settings != NULL) && (s_settings->values.eco_indicator != 0U);
-    bool throttle = (s_settings == NULL) || (s_settings->values.eco_or_fuel != 0U);
-    lv_obj_t *state = lv_obj_get_child(page->eco_rows[UI_SETTINGS_ECO_DISPLAY], 1);
-
-    /* Qt desc: THROTTLE（油门引导） / FUEL（油耗） */
-    row_style(page->eco_rows[UI_SETTINGS_ECO_DISPLAY],
-              page->st.eco_index == UI_SETTINGS_ECO_DISPLAY, true);
-    if(state != NULL) {
-        ui_settings_label_set_text(state, throttle ? "THROTTLE" : "FUEL");
-        lv_obj_set_style_text_color(state, lv_color_hex(UI_COLOR_WHITE), 0);
-    }
-
-    switch_row_state(page->eco_rows[UI_SETTINGS_ECO_INDICATOR],
-                     page->st.eco_index == UI_SETTINGS_ECO_INDICATOR, on);
-    row_style(page->eco_rows[UI_SETTINGS_ECO_BACK],
-              page->st.eco_index == UI_SETTINGS_ECO_BACK, true);
+    model_render(page, UI_SETTINGS_VIEW_ECO);
 }
 
 /*
@@ -1541,6 +1382,7 @@ static void date_wheel_create(ui_settings_page_t *page)
     page->date_wheel_back = page->date_wheel_rows[2];
 }
 
+#include "ui_settings_password.inc"
 #include "ui_settings_factory.inc"
 
 static bool feature_on(unsigned bit)
@@ -1550,11 +1392,10 @@ static bool feature_on(unsigned bit)
 
 static void feature_visibility(ui_settings_page_t *p)
 {
+    model_visibility(p);
     lv_obj_t *rows[] = {p->vehicle_rows[5], p->door_rows[4], p->door_rows[5],
-        p->door_rows[2], p->door_rows[3], p->light_rows[2], p->light_rows[3],
-        p->drv_assist_rows[0], p->assist_rows[UI_SETTINGS_ASSIST_EPS],
-        p->parking_rows[UI_SETTINGS_PARK_REAR_CROSS]};
-    for(unsigned i = 0; i < 10; ++i) {
+        p->door_rows[2], p->door_rows[3], p->light_rows[2], p->light_rows[3]};
+    for(unsigned i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i) {
         if(feature_on(i + 1)) lv_obj_remove_flag(rows[i], LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(rows[i], LV_OBJ_FLAG_HIDDEN);
     }
@@ -1562,6 +1403,10 @@ static void feature_visibility(ui_settings_page_t *p)
 
 static bool feature_selection_enabled(const ui_settings_state_t *st)
 {
+    const model_page_t *model = model_find(st->view);
+    if(model && (st->view != UI_SETTINGS_VIEW_ROOT ||
+                 (st->root_locked && st->root_index == UI_SETTINGS_ROOT_ITINERARY)))
+        return model_selection_enabled(st, model);
     if(st->view == UI_SETTINGS_VIEW_VEHICLE && st->vehicle_index == 5) return feature_on(1);
     if(st->view == UI_SETTINGS_VIEW_DOOR) {
         if(st->door_index == 4) return feature_on(2);
@@ -1571,8 +1416,6 @@ static bool feature_selection_enabled(const ui_settings_state_t *st)
     }
     if(st->view == UI_SETTINGS_VIEW_LIGHT && st->light_index == 2) return feature_on(6);
     if(st->view == UI_SETTINGS_VIEW_LIGHT && st->light_index == 3) return feature_on(7);
-    if(st->view == UI_SETTINGS_VIEW_DRIVING_ASSIST && st->driving_assist_index == 0) return feature_on(8);
-    if(st->view == UI_SETTINGS_VIEW_PARKING && st->parking_index == UI_SETTINGS_PARK_REAR_CROSS) return feature_on(9);
     return true;
 }
 static void connect_rows_render(ui_settings_page_t *page, uint8_t select_index)
@@ -1637,21 +1480,24 @@ static void view_sync(ui_settings_page_t *page)
         lv_obj_add_flag(page->speed_warn_list, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(page->date_list, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(page->date_wheel_list, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(page->password_list, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(page->factory_list, LV_OBJ_FLAG_HIDDEN);
         page->view_ready = true;
         page->shown_view = page->st.view;
         page->shown_root = page->st.root_index;
     }
     switch(page->st.view) {
-    case UI_SETTINGS_VIEW_LANGUAGE:
     case UI_SETTINGS_VIEW_FACTORY_PASSWORD:
+        title = "FACTORY SETTINGS";
+        password_render(page);
+        break;
+    case UI_SETTINGS_VIEW_LANGUAGE:
     case UI_SETTINGS_VIEW_FACTORY:
     case UI_SETTINGS_VIEW_FACTORY_FEATURES:
     case UI_SETTINGS_VIEW_FACTORY_ODO:
     case UI_SETTINGS_VIEW_FACTORY_TANK:
     case UI_SETTINGS_VIEW_FACTORY_MODEL:
         title = page->st.view == UI_SETTINGS_VIEW_LANGUAGE ? "LANGUAGE" :
-            page->st.view == UI_SETTINGS_VIEW_FACTORY_PASSWORD ? "PASSWORD" :
             !s_cmd_cb ? "PLATFORM UNAVAILABLE" : "FACTORY SETTINGS";
         factory_render(page);
         break;
@@ -1835,7 +1681,10 @@ static void view_sync(ui_settings_page_t *page)
         lv_obj_add_flag(page->root_bar, LV_OBJ_FLAG_HIDDEN);
     }
 
-    if(strcmp(lv_label_get_text(page->title), title) != 0)
+    const model_page_t *model = model_find(page->st.view);
+    if(!category_page && model)
+        ui_settings_label_set_id(page->title, model->title, model_language());
+    else
         ui_settings_label_set_text(page->title, title);
 }
 
@@ -1976,6 +1825,39 @@ static void list_center_current(ui_settings_page_t *page)
     }
 }
 
+/* Reserve the actual translated value width before clipping/scrolling the name.
+ * The former fixed 60px reservation overlapped NORMAL, FRONT ONLY and km values. */
+static void detail_rows_layout(lv_obj_t *list)
+{
+    if(lv_obj_has_flag(list, LV_OBJ_FLAG_HIDDEN)) return;
+    for(uint32_t i = 0; i < lv_obj_get_child_count(list); ++i) {
+        lv_obj_t *row = lv_obj_get_child(list, (int32_t)i);
+        lv_obj_t *name = lv_obj_get_child(row, 0);
+        lv_obj_t *value = lv_obj_get_child(row, 1);
+        if(!name || !value || !lv_obj_check_type(name, &lv_label_class) ||
+           !lv_obj_check_type(value, &lv_label_class)) continue;
+        const lv_font_t *font = lv_obj_get_style_text_font(value, 0);
+        lv_point_t size;
+        lv_text_get_size(&size, lv_label_get_text(value), font, 0, 0,
+                         LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+        int32_t width = lv_obj_get_width(row);
+        int32_t value_w = LV_MIN(size.x, width / 2);
+        if(lv_label_get_long_mode(value) != LV_LABEL_LONG_MODE_CLIP)
+            lv_label_set_long_mode(value, LV_LABEL_LONG_MODE_CLIP);
+        lv_obj_set_size(value, LV_MAX(value_w, 1), lv_font_get_line_height(font));
+        if(lv_obj_get_style_text_align(value, 0) != LV_TEXT_ALIGN_RIGHT)
+            lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_RIGHT, 0);
+        if(lv_obj_get_style_align(value, 0) != LV_ALIGN_RIGHT_MID)
+            lv_obj_set_style_align(value, LV_ALIGN_RIGHT_MID, 0);
+        lv_obj_set_pos(value, -20, 0);
+        lv_obj_set_width(name, width - 30 - 10 - value_w - 20);
+        lv_obj_set_height(name, lv_font_get_line_height(lv_obj_get_style_text_font(name, 0)));
+        if(lv_obj_get_style_align(name, 0) != LV_ALIGN_LEFT_MID)
+            lv_obj_set_style_align(name, LV_ALIGN_LEFT_MID, 0);
+        lv_obj_set_pos(name, 30, 0);
+    }
+}
+
 void ui_settings_page_apply(ui_settings_page_t *page)
 {
     if(page == NULL || page->root == NULL) {
@@ -2017,7 +1899,15 @@ void ui_settings_page_apply(ui_settings_page_t *page)
 #undef UPDATE_VISIBLE
     list_center_current(page);
     feature_visibility(page);
-    ui_settings_translate(page->root, s_settings && s_settings->values.language == 0);
+    ui_settings_translate(page->root, model_language());
+    lv_obj_t *details[] = {
+        page->system_list, page->drv_list, page->routine_list, page->eco_list, page->drv_assist_list,
+        page->eps_list, page->parking_list, page->chassis_list, page->vehicle_list,
+        page->light_list, page->door_list, page->turn_list, page->wiper_list,
+        page->service_item_list, page->select_list,
+    };
+    for(size_t i = 0; i < sizeof(details) / sizeof(details[0]); ++i)
+        detail_rows_layout(details[i]);
 }
 
 /* ---------------- 设置写入 ---------------- */
@@ -2197,40 +2087,36 @@ bool ui_settings_page_back(ui_settings_page_t *page)
         st->factory_unlocked = false;
         break;
     case UI_SETTINGS_VIEW_DRIVING_INFO:
+        st->view = UI_SETTINGS_VIEW_ROOT;
         st->drv_index = NONE;
         /* 返回信息选项列表（Qt 顶部列表），焦点回到 DRIVING INFO */
         st->root_locked = true;
         st->info_index = UI_SETTINGS_INFO_DRIVING;
         break;
     case UI_SETTINGS_VIEW_DRIVING_ASSIST:
-        /* 返回驾驶员辅助列表，焦点回到 DRIVING ASSIST */
         st->driving_assist_index = NONE;
-        st->assist_index = UI_SETTINGS_ASSIST_DRIVING;
+        st->assist_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ITINERARY_ASSIST), st->view);
         st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
         break;
     case UI_SETTINGS_VIEW_EPS:
-        /* 返回驾驶员辅助列表，焦点回到 ELECTRIC POWER STEERING */
         st->eps_index = NONE;
-        st->assist_index = UI_SETTINGS_ASSIST_EPS;
+        st->assist_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ITINERARY_ASSIST), st->view);
         st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
         break;
     case UI_SETTINGS_VIEW_PARKING:
-        /* 返回驾驶员辅助列表，焦点回到 PARKING ASSIST */
         st->parking_index = NONE;
-        st->assist_index = UI_SETTINGS_ASSIST_PARKING;
+        st->assist_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ITINERARY_ASSIST), st->view);
         st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
         break;
     case UI_SETTINGS_VIEW_CHASSIS:
-        /* 返回驾驶员辅助列表，焦点回到 CHASSIS CONTROL */
         st->chassis_index = NONE;
-        st->assist_index = UI_SETTINGS_ASSIST_CHASSIS;
+        st->assist_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ITINERARY_ASSIST), st->view);
         st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
         break;
     case UI_SETTINGS_VIEW_ITINERARY_ASSIST:
-        /* 返回行程资讯列表，焦点回到 DRIVING ASSIST */
         st->assist_index = NONE;
         st->root_locked = true;
-        st->it_index = UI_SETTINGS_IT_ASSIST;
+        st->it_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ROOT), st->view);
         st->view = UI_SETTINGS_VIEW_ROOT;
         break;
     case UI_SETTINGS_VIEW_LIGHT:
@@ -2293,10 +2179,9 @@ bool ui_settings_page_back(ui_settings_page_t *page)
         }
         break;
     case UI_SETTINGS_VIEW_VEHICLE:
-        /* 返回行程资讯列表，焦点回到 VEHICLE */
         st->vehicle_index = NONE;
         st->root_locked = true;
-        st->it_index = UI_SETTINGS_IT_VEHICLE;
+        st->it_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ROOT), st->view);
         st->view = UI_SETTINGS_VIEW_ROOT;
         break;
     case UI_SETTINGS_VIEW_SPEED_WARN:
@@ -2449,81 +2334,7 @@ static void info_step(ui_settings_state_t *st, int8_t step)
                                      (int32_t)UI_SETTINGS_INFO_COUNT);
 }
 
-static bool it_enabled(uint8_t index)
-{
-    return (index < UI_SETTINGS_IT_COUNT) && s_it_enabled[index];
-}
-
-/* 行程资讯：跳过置灰项（Qt 隐藏项不参与焦点） */
-static void it_step(ui_settings_state_t *st, int8_t step)
-{
-    uint8_t index;
-    uint8_t i;
-
-    if(!st->root_locked) {
-        return;
-    }
-
-    index = st->it_index;
-    if(index == NONE) {
-        index = (step > 0) ? (uint8_t)(UI_SETTINGS_IT_COUNT - 1U) : 0U;
-    }
-
-    for(i = 0U; i < UI_SETTINGS_IT_COUNT; ++i) {
-        index = (uint8_t)(((int32_t)index + step +
-                           (int32_t)UI_SETTINGS_IT_COUNT) %
-                          (int32_t)UI_SETTINGS_IT_COUNT);
-        if(it_enabled(index)) {
-            break;
-        }
-    }
-
-    st->it_index = index;
-}
-
-static bool assist_enabled(uint8_t index)
-{
-    /* 电动助力转向按工厂开关 enableElectricPowerSteering（bit6）显示 */
-    if(index == UI_SETTINGS_ASSIST_EPS) {
-        return feature_on(6);
-    }
-    return (index < UI_SETTINGS_ASSIST_COUNT) && s_assist_enabled[index];
-}
-
-/* 驾驶员辅助：跳过工厂位关闭的行 */
-static void assist_step(ui_settings_state_t *st, int8_t step)
-{
-    uint8_t index = st->assist_index;
-    uint8_t i;
-
-    if(index == NONE) {
-        index = (step > 0) ? (uint8_t)(UI_SETTINGS_ASSIST_COUNT - 1U) : 0U;
-    }
-
-    for(i = 0U; i < UI_SETTINGS_ASSIST_COUNT; ++i) {
-        index = (uint8_t)(((int32_t)index + step +
-                           (int32_t)UI_SETTINGS_ASSIST_COUNT) %
-                          (int32_t)UI_SETTINGS_ASSIST_COUNT);
-        if(assist_enabled(index)) {
-            break;
-        }
-    }
-
-    st->assist_index = index;
-}
-
 /* Qt DrivingHelp 的 sendLightset：只发 0x16 SetGet，不在本地翻转 */
-static void drv_assist_send(uint8_t index, bool on)
-{
-    car_cmd_t cmd;
-
-    if(s_cmd_cb == NULL) {
-        return;
-    }
-    if(car_cmd_set_driver_assist(&cmd, index, on)) {
-        s_cmd_cb(&cmd);
-    }
-}
 
 /* Qt sendLightset：车辆设置项只发 0x16 SetGet，显示等 0x86 回读 */
 static void vehicle_send(uint8_t index, uint8_t status)
@@ -2584,23 +2395,7 @@ static void door_step(ui_settings_state_t *st, int8_t step)
                                      (int32_t)UI_SETTINGS_DOOR_COUNT);
 }
 
-static void turn_step(ui_settings_state_t *st, int8_t step)
-{
-    st->turn_index = (st->turn_index == NONE)
-                         ? ((step > 0) ? 0U : (uint8_t)(UI_SETTINGS_TURN_COUNT - 1U))
-                         : (uint8_t)(((int32_t)st->turn_index + step +
-                                      (int32_t)UI_SETTINGS_TURN_COUNT) %
-                                     (int32_t)UI_SETTINGS_TURN_COUNT);
-}
 
-static void wiper_step(ui_settings_state_t *st, int8_t step)
-{
-    st->wiper_index = (st->wiper_index == NONE)
-                          ? ((step > 0) ? 0U : (uint8_t)(UI_SETTINGS_WIPER_COUNT - 1U))
-                          : (uint8_t)(((int32_t)st->wiper_index + step +
-                                       (int32_t)UI_SETTINGS_WIPER_COUNT) %
-                                      (int32_t)UI_SETTINGS_WIPER_COUNT);
-}
 
 static void service_step(ui_settings_state_t *st, int8_t step)
 {
@@ -2639,274 +2434,36 @@ static void select_step(ui_settings_state_t *st, int8_t step)
 static bool handle_it_key(ui_settings_page_t *page, uint8_t code)
 {
     ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        it_step(st, -1);
-        break;
-    case UI_KEY_DOWN:
-        it_step(st, 1);
-        break;
-    case UI_KEY_OK:
-        if(!st->root_locked) {
-            st->root_locked = true;
-            st->it_index = NONE;
-            it_step(st, 1);
-            break;
-        }
-        if(st->it_index == UI_SETTINGS_IT_BACK) {
-            st->root_locked = false;
-            st->it_index = NONE;
-            pop_to_root(st);
-        }
-        else if(st->it_index == UI_SETTINGS_IT_ASSIST) {
-            /* Qt PageItineraryItem → DrivePeopleHelp */
-            st->assist_index = NONE;
-            st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
-        }
-        else if(st->it_index == UI_SETTINGS_IT_VEHICLE) {
-            /* Qt PageItineraryItem → CarSettings */
-            st->vehicle_index = NONE;
-            st->view = UI_SETTINGS_VIEW_VEHICLE;
-        }
-        break;
-    default:
-        return false;
+    if(!st->root_locked && code == UI_KEY_OK) {
+        st->root_locked = true;
+        st->it_index = NONE;
+        return model_key(page, UI_KEY_DOWN);
     }
-
-    return true;
+    return model_key(page, code);
 }
 
 static bool handle_it_assist_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        assist_step(st, -1);
-        break;
-    case UI_KEY_DOWN:
-        assist_step(st, 1);
-        break;
-    case UI_KEY_OK:
-        if(st->assist_index == NONE) {
-            st->assist_index = UI_SETTINGS_ASSIST_DRIVING;
-            break;
-        }
-        if(st->assist_index == UI_SETTINGS_ASSIST_BACK) {
-            /* 返回行程资讯列表，焦点回到 DRIVING ASSIST */
-            st->assist_index = NONE;
-            st->root_locked = true;
-            st->it_index = UI_SETTINGS_IT_ASSIST;
-            st->view = UI_SETTINGS_VIEW_ROOT;
-        }
-        else if(st->assist_index == UI_SETTINGS_ASSIST_DRIVING) {
-            /* Qt DrivePeopleHelp → DrivingHelp */
-            st->driving_assist_index = NONE;
-            st->view = UI_SETTINGS_VIEW_DRIVING_ASSIST;
-        }
-        else if(st->assist_index == UI_SETTINGS_ASSIST_EPS) {
-            /* Qt DrivePeopleHelp → ElectricPowerStepping（工厂开关控制可见） */
-            st->eps_index = NONE;
-            st->view = UI_SETTINGS_VIEW_EPS;
-        }
-        else if(st->assist_index == UI_SETTINGS_ASSIST_PARKING) {
-            /* Qt DrivePeopleHelp → ParkAssist */
-            st->parking_index = NONE;
-            st->view = UI_SETTINGS_VIEW_PARKING;
-        }
-        else if(st->assist_index == UI_SETTINGS_ASSIST_CHASSIS) {
-            /* Qt DrivePeopleHelp → ChassistControl */
-            st->chassis_index = NONE;
-            st->view = UI_SETTINGS_VIEW_CHASSIS;
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 电动助力转向：OK 按 MCU 回读值切换 0 常规 / 1 运动，显示等回读刷新 */
-static bool handle_eps_key(ui_settings_page_t *page, uint8_t code)
-{
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->eps_index = (st->eps_index == NONE || st->eps_index == 0U)
-                            ? (uint8_t)(UI_SETTINGS_EPS_COUNT - 1U)
-                            : (uint8_t)(st->eps_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->eps_index = (st->eps_index == NONE)
-                            ? 0U
-                            : (uint8_t)((st->eps_index + 1U) %
-                                        UI_SETTINGS_EPS_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->eps_index == NONE) {
-            st->eps_index = 0U;
-        }
-        else if(st->eps_index == UI_SETTINGS_EPS_BACK) {
-            st->eps_index = NONE;
-            st->assist_index = UI_SETTINGS_ASSIST_EPS;
-            st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
-        }
-        else if(st->eps_index == UI_SETTINGS_EPS_MODE) {
-            vehicle_send(9U, (uint8_t)((s_eps_mode == 1U) ? 0U : 1U));
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
-}
-
 /* 驻车辅助：开关行取反，音量/距离/传感器 3 档循环，显示等 0x86 回读刷新 */
 static bool handle_parking_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->parking_index = (st->parking_index == NONE || st->parking_index == 0U)
-                                ? (uint8_t)(UI_SETTINGS_PARK_COUNT - 1U)
-                                : (uint8_t)(st->parking_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->parking_index = (st->parking_index == NONE)
-                                ? 0U
-                                : (uint8_t)((st->parking_index + 1U) %
-                                            UI_SETTINGS_PARK_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->parking_index == NONE) {
-            st->parking_index = 0U;
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_BACK) {
-            st->parking_index = NONE;
-            st->assist_index = UI_SETTINGS_ASSIST_PARKING;
-            st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_MOVING_OBJECT) {
-            vehicle_send(4U, (uint8_t)(s_pc_moving_object ? 0U : 1U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_FRONT_RADAR) {
-            vehicle_send(5U, (uint8_t)(s_pc_front_radar ? 0U : 1U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_REAR_RADAR) {
-            vehicle_send(6U, (uint8_t)(s_pc_rear_radar ? 0U : 1U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_DISPLAY) {
-            vehicle_send(7U, (uint8_t)(s_pc_display ? 0U : 1U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_REAR_CROSS) {
-            vehicle_send(26U, (uint8_t)(s_pc_rear_cross ? 0U : 1U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_VOLUME) {
-            vehicle_send(17U, (uint8_t)((s_pc_radar_volume + 1U) % 3U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_DISTANCE) {
-            vehicle_send(18U, (uint8_t)((s_pc_radar_distance + 1U) % 3U));
-        }
-        else if(st->parking_index == UI_SETTINGS_PARK_SENSOR) {
-            vehicle_send(27U, (uint8_t)((s_pc_parking_sensor + 1U) % 3U));
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 底盘控制：OK 取反发命令，显示等 0x86 回读刷新 */
 static bool handle_chassis_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->chassis_index = (st->chassis_index == NONE || st->chassis_index == 0U)
-                                ? (uint8_t)(UI_SETTINGS_CHASSIS_COUNT - 1U)
-                                : (uint8_t)(st->chassis_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->chassis_index = (st->chassis_index == NONE)
-                                ? 0U
-                                : (uint8_t)((st->chassis_index + 1U) %
-                                            UI_SETTINGS_CHASSIS_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->chassis_index == NONE) {
-            st->chassis_index = 0U;
-        }
-        else if(st->chassis_index == UI_SETTINGS_CHASSIS_BACK) {
-            st->chassis_index = NONE;
-            st->assist_index = UI_SETTINGS_ASSIST_CHASSIS;
-            st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
-        }
-        else if(st->chassis_index == UI_SETTINGS_CHASSIS_TRACE) {
-            vehicle_send(8U, (uint8_t)(s_pc_trace ? 0U : 1U));
-        }
-        else if(st->chassis_index == UI_SETTINGS_CHASSIS_BRAKE) {
-            vehicle_send(19U, (uint8_t)(s_pc_engine_brake ? 0U : 1U));
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 驾驶辅助：OK 按 MCU 当前值取反发命令；显示等 0x16 Status 回读刷新 */
 static bool handle_driving_assist_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->driving_assist_index =
-            (st->driving_assist_index == NONE ||
-             st->driving_assist_index == 0U)
-                ? (uint8_t)(UI_SETTINGS_DA_COUNT - 1U)
-                : (uint8_t)(st->driving_assist_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->driving_assist_index =
-            (st->driving_assist_index == NONE)
-                ? 0U
-                : (uint8_t)((st->driving_assist_index + 1U) %
-                            UI_SETTINGS_DA_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->driving_assist_index == NONE) {
-            st->driving_assist_index = 0U;
-        }
-        else if(st->driving_assist_index == UI_SETTINGS_DA_BACK) {
-            st->driving_assist_index = NONE;
-            st->assist_index = UI_SETTINGS_ASSIST_DRIVING;
-            st->view = UI_SETTINGS_VIEW_ITINERARY_ASSIST;
-        }
-        else if(st->driving_assist_index == UI_SETTINGS_DA_EMERGENCY) {
-            drv_assist_send(1U, !s_da_emergency);
-        }
-        else if(st->driving_assist_index == UI_SETTINGS_DA_LANE) {
-            drv_assist_send(2U, !s_da_lane);
-        }
-        else if(st->driving_assist_index == UI_SETTINGS_DA_BLIND) {
-            drv_assist_send(3U, !s_da_blind);
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 车辆设置：灯光设置/车门进入下一级，返回行程资讯列表 */
@@ -2927,10 +2484,9 @@ static bool handle_vehicle_key(ui_settings_page_t *page, uint8_t code)
             break;
         }
         if(st->vehicle_index == UI_SETTINGS_VEH_BACK) {
-            /* 返回行程资讯列表，焦点回到 VEHICLE */
             st->vehicle_index = NONE;
             st->root_locked = true;
-            st->it_index = UI_SETTINGS_IT_VEHICLE;
+            st->it_index = model_parent_item(model_find(UI_SETTINGS_VIEW_ROOT), UI_SETTINGS_VIEW_VEHICLE);
             st->view = UI_SETTINGS_VIEW_ROOT;
         }
         else if(st->vehicle_index == UI_SETTINGS_VEH_LIGHT) {
@@ -3166,71 +2722,13 @@ static void service_send(uint8_t type, uint32_t km, bool set_km)
 /* 转向灯：OK 按 MCU 回读值取反下发 0x16 index 12 */
 static bool handle_turn_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        turn_step(st, -1);
-        break;
-    case UI_KEY_DOWN:
-        turn_step(st, 1);
-        break;
-    case UI_KEY_OK:
-        if(st->turn_index == NONE) {
-            st->turn_index = UI_SETTINGS_TURN_LANE_CHANGE;
-        }
-        else if(st->turn_index == UI_SETTINGS_TURN_BACK) {
-            st->turn_index = NONE;
-            st->vehicle_index = UI_SETTINGS_VEH_TURN;
-            st->view = UI_SETTINGS_VIEW_VEHICLE;
-        }
-        else if(st->turn_index == UI_SETTINGS_TURN_LANE_CHANGE) {
-            vehicle_send(12U, s_vs_lane_change ? 0U : 1U);
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 雨刷器：OK 按 MCU 回读值取反下发 0x16 index 20 / 21 / 22 */
 static bool handle_wiper_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        wiper_step(st, -1);
-        break;
-    case UI_KEY_DOWN:
-        wiper_step(st, 1);
-        break;
-    case UI_KEY_OK:
-        if(st->wiper_index == NONE) {
-            st->wiper_index = UI_SETTINGS_WIPER_SPEED_SENSE;
-        }
-        else if(st->wiper_index == UI_SETTINGS_WIPER_BACK) {
-            st->wiper_index = NONE;
-            st->vehicle_index = UI_SETTINGS_VEH_WIPER;
-            st->view = UI_SETTINGS_VIEW_VEHICLE;
-        }
-        else if(st->wiper_index == UI_SETTINGS_WIPER_SPEED_SENSE) {
-            vehicle_send(20U, s_vs_wiper_speed ? 0U : 1U);
-        }
-        else if(st->wiper_index == UI_SETTINGS_WIPER_REAR_LINKAGE) {
-            vehicle_send(21U, s_vs_wiper_rear ? 0U : 1U);
-        }
-        else if(st->wiper_index == UI_SETTINGS_WIPER_MIST) {
-            vehicle_send(22U, s_vs_wiper_mist ? 0U : 1U);
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 保养主列表：进入机油 / 轮胎 / 自定义子页 */
@@ -3465,6 +2963,7 @@ static bool handle_system_key(ui_settings_page_t *page, uint8_t code)
             st->factory_unlocked = false;
             st->factory_error = false;
             memset(st->factory_digits, 0, sizeof(st->factory_digits));
+            if(st->system_index == 3U) password_enter(page);
         }
         else if(st->system_index == 1U) {
             date_page_enter(page);
@@ -3566,7 +3065,7 @@ static bool handle_root_key(ui_settings_page_t *page, uint8_t code)
             st->root_locked = true;
             st->view = UI_SETTINGS_VIEW_ROOT;
             st->it_index = NONE;
-            it_step(st, 1);
+            (void)model_key(page, UI_KEY_DOWN);
         }
         break;
     default:
@@ -3727,50 +3226,10 @@ static bool handle_info_key(ui_settings_page_t *page, uint8_t code)
 
     return true;
 }
-//调用 Qt CarSettings 接口，0x16 index 0/1/2，取反下发
+/* 行车信息：调用模型绑定的本地 setter。 */
 static bool handle_driving_info_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->drv_index = (st->drv_index == NONE || st->drv_index == 0U)
-                            ? (uint8_t)(UI_SETTINGS_DRV_COUNT - 1U)
-                            : (uint8_t)(st->drv_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->drv_index = (st->drv_index == NONE)
-                            ? 0U
-                            : (uint8_t)((st->drv_index + 1U) % UI_SETTINGS_DRV_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->drv_index == NONE) {
-            st->drv_index = 0U;
-        }
-        else if(st->drv_index == UI_SETTINGS_DRV_BACK) {
-            st->drv_index = NONE;
-            st->view = UI_SETTINGS_VIEW_ROOT;
-        }
-        else if(s_settings != NULL) {
-            if(st->drv_index == UI_SETTINGS_DRV_OUT_TEMP) {
-                (void)car_settings_set_out_temperature(
-                    s_settings, s_settings->values.out_temperature == 0U);
-            }
-            else if(st->drv_index == UI_SETTINGS_DRV_GEAR) {
-                (void)car_settings_set_gear_on(
-                    s_settings, s_settings->values.gear_on == 0U);
-            }
-            else {
-                (void)car_settings_set_avg_fuel_on(
-                    s_settings, s_settings->values.avg_fuel_on == 0U);
-            }
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
 /* 常规设置：上下循环 5 项；OK 对亮度步进、对超速开关取反 */
@@ -3902,73 +3361,21 @@ static bool handle_routine_key(ui_settings_page_t *page, uint8_t code)
     return true;
 }
 
-/*
- * ECO 设置：显示（油门引导 / 油耗）+ ECO 指示 + 返回。
- * Qt 的“显示”是 PageListSelect 子页，选项只有两项，这里左右键直接切换，
- * OK 在两项之间翻转。
- */
+/* ECO 设置：OK 循环显示选项或切换开关，行为来自功能绑定。 */
 static bool handle_eco_key(ui_settings_page_t *page, uint8_t code)
 {
-    ui_settings_state_t *st = &page->st;
-
-    switch(code) {
-    case UI_KEY_UP:
-        st->eco_index = (st->eco_index == NONE || st->eco_index == 0U)
-                            ? (uint8_t)(UI_SETTINGS_ECO_COUNT - 1U)
-                            : (uint8_t)(st->eco_index - 1U);
-        break;
-    case UI_KEY_DOWN:
-        st->eco_index = (st->eco_index == NONE)
-                            ? 0U
-                            : (uint8_t)((st->eco_index + 1U) % UI_SETTINGS_ECO_COUNT);
-        break;
-    case UI_KEY_OK:
-        if(st->eco_index == NONE) {
-            st->eco_index = 0U;
-        }
-        else if(st->eco_index == UI_SETTINGS_ECO_BACK) {
-            pop_to_mycar(st);
-        }
-        else if(s_settings != NULL) {
-            if(st->eco_index == UI_SETTINGS_ECO_DISPLAY) {
-                (void)car_settings_set_eco_or_fuel(
-                    s_settings, s_settings->values.eco_or_fuel == 0U);
-            }
-            else {
-                (void)car_settings_set_eco_indicator(
-                    s_settings, s_settings->values.eco_indicator == 0U);
-            }
-        }
-        break;
-    default:
-        return false;
-    }
-
-    return true;
+    return model_key(page, code);
 }
 
-/*
- * ECO 历史信息（Qt EcoavgShow）：SigNext / SigBack 都直接 goBack；
- * SigOk 调 resetAllData —— 这里改为“记录当前值”更符合历史页语义：
- * 当前平均油耗非 0 时按 Qt updateHistory 推入并落盘，全 0 时等同于重置。
- */
-static bool handle_eco_history_key(ui_settings_page_t *page, uint8_t code)
+/* 只读详情页：任意按键只返回一级，不修改数据或继续操作父菜单。 */
+bool ui_settings_page_dismiss_readonly(ui_settings_page_t *page)
 {
-    (void)page;
-
-    switch(code) {
-    case UI_KEY_UP:
-    case UI_KEY_DOWN:
-        /* 单页无列表，方向键无操作 */
-        return true;
-    case UI_KEY_OK:
-        if(s_settings != NULL) {
-            (void)car_settings_eco_history_push(s_settings, s_eco_current_x10);
-        }
-        return true;
-    default:
+    if(page == NULL || !page->active ||
+       (page->st.view != UI_SETTINGS_VIEW_VERSION &&
+        page->st.view != UI_SETTINGS_VIEW_ECO_HISTORY)) {
         return false;
     }
+    return ui_settings_page_back(page);
 }
 
 /* Qt nextTumblerIndex：光标 0→1→…→5，到端点后反向 */
@@ -4167,6 +3574,7 @@ bool ui_settings_page_key(ui_settings_page_t *page, const ui_key_event_t *evt)
         return false;
     }
 
+    if(ui_settings_page_dismiss_readonly(page)) return true;
     if(evt->code == UI_KEY_OK && !feature_selection_enabled(&page->st)) return true;
     switch(page->st.view) {
     case UI_SETTINGS_VIEW_LANGUAGE:
@@ -4213,9 +3621,6 @@ bool ui_settings_page_key(ui_settings_page_t *page, const ui_key_event_t *evt)
     case UI_SETTINGS_VIEW_SYSTEM:
         handled = handle_system_key(page, evt->code);
         break;
-    case UI_SETTINGS_VIEW_VERSION:
-        handled = (evt->code == UI_KEY_UP || evt->code == UI_KEY_DOWN);
-        break;
     case UI_SETTINGS_VIEW_ROOT:
         if(page->st.root_locked) {
             handled = (page->st.root_index == UI_SETTINGS_ROOT_ITINERARY)
@@ -4250,9 +3655,6 @@ bool ui_settings_page_key(ui_settings_page_t *page, const ui_key_event_t *evt)
     case UI_SETTINGS_VIEW_ECO:
         handled = handle_eco_key(page, evt->code);
         break;
-    case UI_SETTINGS_VIEW_ECO_HISTORY:
-        handled = handle_eco_history_key(page, evt->code);
-        break;
     case UI_SETTINGS_VIEW_ITINERARY_ASSIST:
         handled = handle_it_assist_key(page, evt->code);
         break;
@@ -4260,7 +3662,7 @@ bool ui_settings_page_key(ui_settings_page_t *page, const ui_key_event_t *evt)
         handled = handle_driving_assist_key(page, evt->code);
         break;
     case UI_SETTINGS_VIEW_EPS:
-        handled = handle_eps_key(page, evt->code);
+        handled = model_key(page, evt->code);
         break;
     case UI_SETTINGS_VIEW_PARKING:
         handled = handle_parking_key(page, evt->code);
@@ -4324,7 +3726,7 @@ void ui_settings_page_next_or_back(ui_settings_page_t *page)
         /* 信息选项/行程资讯列表锁定在根页内，按序号前进 */
         if(st->root_locked) {
             if(st->root_index == UI_SETTINGS_ROOT_ITINERARY) {
-                it_step(st, 1);
+                (void)model_key(page, UI_KEY_DOWN);
             }
             else {
                 info_step(st, 1);
@@ -4768,6 +4170,7 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
     page->factory_list = make_list(page->body);
     for(i = 0; i < 20; ++i)
         page->factory_rows[i] = make_row(page->factory_list, LIST_X, i * ROW_H, LIST_W, ROW_H, "");
+    password_create(page);
     page->system_list = make_list(page->body);
     for(i = 0U; i < UI_SETTINGS_SYSTEM_COUNT; ++i) {
         lv_obj_t *row = make_row(page->system_list, (SETTINGS_W - 450) / 2,
@@ -4794,28 +4197,36 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
     }
     date_wheel_create(page);
     page->version_list = make_list(page->body);
+    lv_obj_set_height(page->version_list, SETTINGS_H - SUBPAGE_BODY_Y);
     {
+        /* Qt PageVersionDisplay: centered 400px column, 370px items,
+         * 61px rows + 4px spacing. Names sit above the smaller values. */
         static const char *const labels[5] = {
             "APP VERSION", "MAIN FIRMWARE", "SMALL CHIP", "WIRED", "SYSTEM VERSION",
         };
         for(i = 0U; i < 5U; ++i) {
-            lv_obj_t *row = make_row(page->version_list, 20, 60 * (int32_t)i,
-                                     SETTINGS_W - 40, 60, labels[i]);
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *value = make_label(row, "---", UI_FONT_LG, UI_COLOR_WHITE);
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, 250);
-            lv_obj_set_pos(label, ROW_OFFSET_X, 16);
-            lv_obj_align(value, LV_ALIGN_RIGHT_MID, -20, 0);
+            lv_obj_t *row = ui_blank_container(page->version_list);
+            lv_obj_set_pos(row, (SETTINGS_W - 370) / 2, 65 * (int32_t)i);
+            lv_obj_set_size(row, 370,
+                i == 4U ? SETTINGS_H - SUBPAGE_BODY_Y - 4 * 65 : 61);
+            lv_obj_t *label = make_label(row, labels[i], UI_TEXT(26), UI_COLOR_WHITE);
+            lv_obj_set_pos(label, 0, 0);
+            lv_obj_t *value = make_label(row, "---", UI_TEXT(20), UI_COLOR_WHITE);
+            lv_obj_set_width(value, i == 4U ? 364 : i == 0U ? 200 : 350);
+            lv_label_set_long_mode(value, LV_LABEL_LONG_MODE_WRAP);
+            if(i == 4U) {
+                lv_obj_set_pos(value, 0, lv_font_get_line_height(UI_TEXT(26)));
+            }
+            else {
+                lv_obj_align(value, LV_ALIGN_BOTTOM_LEFT, 0, -6);
+            }
             page->version_values[i] = value;
         }
         {
-            page->version_updated = make_label(page->version_list, "---", UI_FONT_SM,
+            lv_obj_t *app_row = lv_obj_get_parent(page->version_values[0]);
+            page->version_updated = make_label(app_row, "---", UI_TEXT(20),
                                                 UI_COLOR_WHITE);
-            lv_obj_align(page->version_updated, LV_ALIGN_TOP_RIGHT, -36, 38);
-            lv_obj_set_width(page->version_updated, 140);
-            lv_obj_set_style_text_align(page->version_updated, LV_TEXT_ALIGN_RIGHT, 0);
-            lv_obj_set_pos(page->version_values[0], 390, 16);
+            lv_obj_align(page->version_updated, LV_ALIGN_BOTTOM_RIGHT, -20, -6);
         }
     }
 
@@ -4894,25 +4305,7 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
     }
 
     /* 行车信息：3 个开关 + 返回（右侧 ON/OFF） */
-    page->drv_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_DRV_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->drv_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_drv_labels[i]);
-
-        if(i != UI_SETTINGS_DRV_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "OFF", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->drv_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_DRIVING_INFO)) { ui_settings_page_destroy(page); return false; }
 
     /* 常规设置：亮度、超速报警、超速预警值 + 返回。 */
     page->routine_list = make_list(page->body);
@@ -4935,44 +4328,13 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
         page->routine_rows[i] = row;
     }
 
-    /* ECO 设置：显示 THROTTLE/FUEL、ECO 指示 ON/OFF + 返回 */
-    page->eco_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_ECO_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->eco_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_eco_labels[i]);
-
-        if(i != UI_SETTINGS_ECO_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->eco_rows[i] = row;
-    }
+/* ECO 设置 */
+    if(!model_create(page, UI_SETTINGS_VIEW_ECO)) { ui_settings_page_destroy(page); return false; }
 
     eco_history_create(page);
 
-    /* 行程资讯：驾驶员辅助 / 返回（行高 60，与 Qt 二级列表一致） */
-    page->it_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_IT_COUNT; ++i) {
-        page->it_rows[i] = make_row(page->it_list, LIST_X,
-                                    ROW_H * (int32_t)i, LIST_W, ROW_H,
-                                    s_it_labels[i]);
-    }
-
-    /* 驾驶员辅助：驾驶辅助 / 返回 */
-    page->assist_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_ASSIST_COUNT; ++i) {
-        page->assist_rows[i] = make_row(page->assist_list, LIST_X,
-                                        UNIT_ROW_H * (int32_t)i, LIST_W,
-                                        UNIT_ROW_H, s_assist_labels[i]);
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_ROOT)) { ui_settings_page_destroy(page); return false; }
+    if(!model_create(page, UI_SETTINGS_VIEW_ITINERARY_ASSIST)) { ui_settings_page_destroy(page); return false; }
 
     /* 超速预警值：百/十/个位编辑，按键确认后下发 MCU。 */
     page->speed_warn_list = make_list(page->body);
@@ -4996,88 +4358,16 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
         lv_obj_align(unit, LV_ALIGN_CENTER, 0, 70);
     }
 
-    page->drv_assist_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_DA_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->drv_assist_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_da_labels[i]);
-
-        if(i != UI_SETTINGS_DA_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "OFF", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->drv_assist_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_DRIVING_ASSIST)) { ui_settings_page_destroy(page); return false; }
 
     /* 电动助力转向：模式（NORMAL/SPORT）+ 返回 */
-    page->eps_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_EPS_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->eps_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_eps_labels[i]);
-
-        if(i == UI_SETTINGS_EPS_MODE) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "NORMAL", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->eps_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_EPS)) { ui_settings_page_destroy(page); return false; }
 
     /* 驻车辅助：5 个开关行 + 音量/距离/传感器 3 档 + 返回 */
-    page->parking_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_PARK_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->parking_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_park_labels[i]);
-
-        if(i != UI_SETTINGS_PARK_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->parking_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_PARKING)) { ui_settings_page_destroy(page); return false; }
 
     /* 底盘控制：主动弯道控制 / 主动发动机制动 + 返回 */
-    page->chassis_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_CHASSIS_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->chassis_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_chassis_labels[i]);
-
-        if(i != UI_SETTINGS_CHASSIS_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->chassis_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_CHASSIS)) { ui_settings_page_destroy(page); return false; }
 
     /* 车辆设置：灯光设置 / 车门 / 返回（行高 60） */
     page->vehicle_list = make_list(page->body);
@@ -5142,46 +4432,10 @@ bool ui_settings_page_create(ui_settings_page_t *page, lv_obj_t *parent)
     }
 
     /* 转向灯：变更车道闪灯 3 次 ON/OFF + 返回 */
-    page->turn_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_TURN_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->turn_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_turn_labels[i]);
-
-        if(i != UI_SETTINGS_TURN_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->turn_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_TURN)) { ui_settings_page_destroy(page); return false; }
 
     /* 雨刷器：三项 ON/OFF + 返回 */
-    page->wiper_list = make_list(page->body);
-    for(i = 0U; i < UI_SETTINGS_WIPER_COUNT; ++i) {
-        lv_obj_t *row = make_row(page->wiper_list, LIST_X,
-                                 UNIT_ROW_H * (int32_t)i, LIST_W, UNIT_ROW_H,
-                                 s_wiper_labels[i]);
-
-        if(i != UI_SETTINGS_WIPER_BACK) {
-            lv_obj_t *label = lv_obj_get_child(row, 0);
-            lv_obj_t *state = make_label(row, "ON", UI_FONT_LG, UI_COLOR_WHITE);
-
-            lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_LEFT, 0);
-            lv_obj_set_width(label, LIST_W - ROW_OFFSET_X - 60);
-            lv_obj_set_pos(label, ROW_OFFSET_X,
-                           (UNIT_ROW_H - lv_font_get_line_height(UI_FONT_LG)) / 2);
-            lv_obj_align(state, LV_ALIGN_RIGHT_MID, -20, 0);
-        }
-
-        page->wiper_rows[i] = row;
-    }
+    if(!model_create(page, UI_SETTINGS_VIEW_WIPER)) { ui_settings_page_destroy(page); return false; }
 
     /* 保养主列表：机油 / 轮胎 / 自定义 / 返回（行高 60） */
     page->service_list = make_list(page->body);
@@ -5278,5 +4532,7 @@ void ui_settings_page_destroy(ui_settings_page_t *page)
         lv_obj_delete(page->root);
     }
 
+    for(size_t i = 0; i < MODEL_COUNT(model_pages); ++i)
+        lv_free(model_rows(page, &model_pages[i]));
     memset(page, 0, sizeof(*page));
 }

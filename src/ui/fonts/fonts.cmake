@@ -48,6 +48,9 @@ set(CARMW_QT_FONT_SOURCES
     src/ui/fonts/ui_qt_forgotten_62.c
     src/ui/fonts/ui_qt_bebas_28.c
     src/ui/fonts/ui_qt_bebas_36_bold.c
+    src/ui/fonts/ui_qt_arial_20.c
+    src/ui/fonts/ui_qt_arial_22.c
     src/ui/fonts/ui_qt_arial_24.c
     src/ui/fonts/ui_qt_arial_24_bold.c
+    src/ui/fonts/ui_qt_arial_28.c
 )

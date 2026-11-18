@@ -187,6 +187,8 @@ if(CARMW_BUILD_UI)
         src/ui/overlays/ov_tips.c
         src/ui/settings/ui_settings_page.c
         src/ui/settings/ui_settings_language.c
+        src/ui/settings/ui_settings_menu.c
+        src/ui/settings/ui_settings_text.c
     )
     target_include_directories(carmw_ui PUBLIC src)
     target_link_libraries(carmw_ui PUBLIC carmw lvgl::lvgl)

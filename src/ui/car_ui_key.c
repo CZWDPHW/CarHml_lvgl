@@ -7,6 +7,7 @@
  * 设置页打开且可见时（Qt settingsPageOpen && speed < 5）：
  *   23 交给设置页，19/20/21/22/26 交给设置页，13 返回上级，
  *   31 被屏蔽（Qt 设置页打开时不切样式）。
+ *   版本信息/ECO 历史详情例外：任意短按或长按只返回上一层。
  * 尚未收到速度帧时 23 也允许打开，避免“按键被静默吞掉”。
  */
 #include "ui/car_ui_key.h"
@@ -57,9 +58,16 @@ static bool map_key(const car_key_event_t *evt, ui_dispatch_ctx_t *ctx,
 
     in_settings = settings_visible();
 
+    /* 版本/ECO 历史只读详情：短按或长按任意键都只退出详情。
+     * 在返回、切样式等独立路由之前消费，避免同一次按键继续生效。 */
+    if((evt->pressed == KEY_SHORT || evt->pressed == KEY_LONG) &&
+       in_settings && ui_app_settings_dismiss_readonly()) {
+        return false;
+    }
+
     /*
      * 长按 19/20 映射为左/右推摇杆（翻卡），其余长按无动作；
-     * 设置页打开时不接受长按，避免误触翻卡。
+     * 其它设置页不接受长按，避免误触翻卡。
      */
     if(evt->pressed == KEY_LONG) {
         if(in_settings) {

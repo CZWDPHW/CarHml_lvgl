@@ -23,6 +23,8 @@
 
 QML 未明确指定字体族的拉丁文字暂保留 Montserrat，字号与粗细按对应字段设置。未捕获原 Qt 运行时默认字体解析结果，不能将这些字段视为字体族已完全对齐。中文来自原项目 `NotoSansCJK-Regular.ttc` 的简体中文字面，合并到对应字号的通用、Geely 和 Arial 字库中。
 
+2026-11-18 设置页例外：按英文偏大与左右叠字的反馈，英文菜单改用Arial Regular 22px、标题28px、辅助文字20px，中文字号保留；新增Arial 20/22/28，生成规格总数由50增至53。仪表本体的通用字体保留原样。Qt 默认字体尚无目标机运行时证据，不能将此选择宣称为字体族完全对齐；布局、回归与预览见 [SETTINGS_VISUAL_PORT.md](SETTINGS_VISUAL_PORT.md)。
+
 2026-11-17 英文温度符号修复：原始 Bebas 字体不含 U+00B0（°），现在在 Bebas 28 静态字库中合入 Noto Sans CJK SC 同字号的该字符；生成器和 manifest 同步记录补字来源。其余 ASCII 字形描述、行高和基线与补字前一致。补回归复现了英文缺字符问题，修复后覆盖 °C/°F、中英切换；Windows 8/8、Linux 11/11 通过，含画面字体检查 1037 项、0 失败。[英文温度实际渲染](preview/fonts/temperature-en.png)。Release/AArch64 产物已更新，SHA256 `b32ad8b3b3a57365b6f2f37cc885665fa583ef22d0b0792191cb0c8fc4664b8f`；未部署。
 
 ## 实现和资源

@@ -87,6 +87,26 @@ int main(void)
         }
         printf("settings identical input: renders=%u\n", renders);
         CHECK(renders == 0);
+        page.st.view = UI_SETTINGS_VIEW_EPS;
+        page.st.eps_index = 0xFFU;
+        ui_settings_page_apply(&page);
+        settle();
+        renders = 0;
+        for(unsigned i = 0; i < 20; ++i) {
+            ui_settings_page_apply(&page);
+            settle();
+        }
+        CHECK(renders == 0);
+        page.st.view = UI_SETTINGS_VIEW_FACTORY_PASSWORD;
+        page.st.factory_index = 0U;
+        ui_settings_page_apply(&page);
+        settle();
+        renders = 0;
+        for(unsigned i = 0; i < 20; ++i) {
+            ui_settings_page_apply(&page);
+            settle();
+        }
+        CHECK(renders == 0);
         page.st.view = UI_SETTINGS_VIEW_DATE;
         ui_settings_page_apply(&page);
         repeat_input(&page);

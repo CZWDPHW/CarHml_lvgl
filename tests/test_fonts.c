@@ -159,6 +159,88 @@ static void test_connect_text_bounds(void)
 
 static uint32_t s_frame[1920 * 720];
 
+static void test_settings_text_layout(void)
+{
+    car_settings_t settings;
+    car_settings_reset(&settings);
+    settings.values.factory_features = UINT16_MAX;
+    ui_settings_page_set_settings(&settings);
+    ui_settings_page_t page = {0};
+    CHECK(ui_settings_page_create(&page, lv_screen_active()));
+    ui_settings_page_set_active(&page, true);
+    struct {
+        ui_settings_view_t view;
+        lv_obj_t *list;
+        uint8_t *index;
+    } pages[] = {
+        {UI_SETTINGS_VIEW_SYSTEM, page.system_list, &page.st.system_index},
+        {UI_SETTINGS_VIEW_DRIVING_INFO, page.drv_list, &page.st.drv_index},
+        {UI_SETTINGS_VIEW_ROUTINE, page.routine_list, &page.st.routine_index},
+        {UI_SETTINGS_VIEW_ECO, page.eco_list, &page.st.eco_index},
+        {UI_SETTINGS_VIEW_DRIVING_ASSIST, page.drv_assist_list, &page.st.driving_assist_index},
+        {UI_SETTINGS_VIEW_EPS, page.eps_list, &page.st.eps_index},
+        {UI_SETTINGS_VIEW_PARKING, page.parking_list, &page.st.parking_index},
+        {UI_SETTINGS_VIEW_CHASSIS, page.chassis_list, &page.st.chassis_index},
+        {UI_SETTINGS_VIEW_VEHICLE, page.vehicle_list, &page.st.vehicle_index},
+        {UI_SETTINGS_VIEW_LIGHT, page.light_list, &page.st.light_index},
+        {UI_SETTINGS_VIEW_DOOR, page.door_list, &page.st.door_index},
+        {UI_SETTINGS_VIEW_TURN, page.turn_list, &page.st.turn_index},
+        {UI_SETTINGS_VIEW_WIPER, page.wiper_list, &page.st.wiper_index},
+        {UI_SETTINGS_VIEW_SERVICE_ITEM, page.service_item_list, &page.st.service_row},
+        {UI_SETTINGS_VIEW_SELECT, page.select_list, &page.st.select_index},
+    };
+    const uint8_t languages[] = {1U, 0U, 1U};
+    for(size_t language = 0; language < sizeof(languages); ++language) {
+        settings.values.language = languages[language];
+        for(unsigned state = 0; state < 2; ++state) {
+            car_parking_chassis_t pc = {.parking_sensor = state ? 2U : 0U,
+                                       .radar_volume = state ? 2U : 0U};
+            ui_settings_page_set_parking_chassis(&page, &pc);
+            ui_settings_page_set_steering_mode(&page, (uint8_t)state);
+            for(size_t p = 0; p < sizeof(pages) / sizeof(pages[0]); ++p) {
+                page.st.view = pages[p].view;
+                for(unsigned selected = 0; selected < 2; ++selected) {
+                    for(uint32_t i = 0; i < lv_obj_get_child_count(pages[p].list); ++i) {
+                        *pages[p].index = selected ? (uint8_t)i : 0xFFU;
+                        ui_settings_page_apply(&page);
+                        lv_obj_update_layout(page.root);
+                        lv_obj_t *row = lv_obj_get_child(pages[p].list, (int32_t)i);
+                        lv_obj_t *name = lv_obj_get_child(row, 0);
+                        lv_obj_t *value = lv_obj_get_child(row, 1);
+                        if(!name || !value || lv_obj_has_flag(row, LV_OBJ_FLAG_HIDDEN) ||
+                           !lv_obj_check_type(value, &lv_label_class)) continue;
+                        lv_area_t left, right, bounds;
+                        lv_obj_get_coords(name, &left);
+                        lv_obj_get_coords(value, &right);
+                        lv_obj_get_coords(row, &bounds);
+                        CHECK(left.x2 + 10 <= right.x1);
+                        CHECK(right.x2 < bounds.x2 && left.x1 > bounds.x1);
+                        CHECK(left.y1 >= bounds.y1 && left.y2 <= bounds.y2);
+                        CHECK(right.y1 >= bounds.y1 && right.y2 <= bounds.y2);
+                        CHECK(ui_font_pixels(lv_obj_get_style_text_font(name, 0)) ==
+                              (languages[language] ? 22U : 26U));
+                    }
+                }
+            }
+            page.st.view = UI_SETTINGS_VIEW_EPS;
+            ui_settings_page_apply(&page);
+            CHECK(strcmp(lv_label_get_text(page.title), languages[language] ? "EPS" : "电动助力转向") == 0);
+            CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.eps_rows[0], 0)),
+                         languages[language] ? "EPS" : "电动助力转向") == 0);
+            CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.eps_rows[0], 1)),
+                languages[language] ? (state ? "Sport" : "Normal") : (state ? "运动" : "常规")) == 0);
+            page.st.view = UI_SETTINGS_VIEW_PARKING;
+            ui_settings_page_apply(&page);
+            CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.parking_rows[ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_DISTANCE)], 0)),
+                         languages[language] ? "Radar Dist" : "雷达探测距离") == 0);
+            CHECK(strcmp(lv_label_get_text(lv_obj_get_child(page.parking_rows[ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_SENSOR)], 0)),
+                         languages[language] ? "Parking Sensor" : "驻车辅助传感器") == 0);
+        }
+    }
+    ui_settings_page_destroy(&page);
+    ui_settings_page_set_settings(NULL);
+}
+
 static void flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *pixels)
 {
     (void)area;
@@ -292,6 +374,13 @@ static void render_main(const char *path)
     settings.values.language = 0;
     ui_settings_page_apply(&menu);
     save_variant(path, "settings-zh");
+    menu.st.view = UI_SETTINGS_VIEW_VERSION;
+    ui_settings_page_apply(&menu);
+    save_variant(path, "settings-version-zh");
+    settings.values.language = 1;
+    ui_settings_page_apply(&menu);
+    save_variant(path, "settings-version-en");
+    settings.values.language = 0;
     menu.st.view = UI_SETTINGS_VIEW_MY_CAR;
     menu.st.root_index = UI_SETTINGS_ROOT_MY_CAR;
     menu.st.mycar_locked = true;
@@ -302,6 +391,34 @@ static void render_main(const char *path)
     menu.st.card_index = 0;
     ui_settings_page_apply(&menu);
     save_variant(path, "settings-cards-zh");
+    for(unsigned language = 0; language < 2; ++language) {
+        settings.values.language = (uint8_t)language;
+        menu.st.view = UI_SETTINGS_VIEW_EPS;
+        menu.st.eps_index = ui_settings_menu_index(UI_SETTINGS_MENU_EPS, UI_SETTINGS_EPS_MODE);
+        ui_settings_page_set_steering_mode(&menu, 0U);
+        ui_settings_page_apply(&menu);
+        save_variant(path, language ? "settings-eps-en" : "settings-eps-zh");
+        menu.st.view = UI_SETTINGS_VIEW_PARKING;
+        menu.st.parking_index = ui_settings_menu_index(UI_SETTINGS_MENU_PARKING, UI_SETTINGS_PARK_SENSOR);
+        car_parking_chassis_t pc = {.parking_sensor = 2U};
+        ui_settings_page_set_parking_chassis(&menu, &pc);
+        ui_settings_page_apply(&menu);
+        save_variant(path, language ? "settings-parking-en" : "settings-parking-zh");
+        menu.st.view = UI_SETTINGS_VIEW_FACTORY_PASSWORD;
+        menu.st.factory_index = 0U;
+        memset(menu.st.factory_digits, 0, sizeof(menu.st.factory_digits));
+        ui_settings_page_apply(&menu);
+        for(unsigned col = 0; col < 4U; ++col)
+            lv_roller_set_selected(menu.password_rollers[col], 0U, LV_ANIM_OFF);
+        save_variant(path, language ? "settings-password-en" : "settings-password-zh");
+        menu.st.factory_index = 4U;
+        const uint8_t password[] = {1U, 6U, 8U, 8U};
+        memcpy(menu.st.factory_digits, password, sizeof(password));
+        ui_settings_page_apply(&menu);
+        for(unsigned col = 0; col < 4U; ++col)
+            lv_roller_set_selected(menu.password_rollers[col], password[col], LV_ANIM_OFF);
+        save_variant(path, language ? "settings-password-ok-en" : "settings-password-ok-zh");
+    }
     ui_settings_page_destroy(&menu);
     ui_settings_page_set_settings(NULL);
 }
@@ -319,6 +436,7 @@ int main(int argc, char **argv)
     test_temperature_symbols();
     test_frame_font_changes();
     test_connect_text_bounds();
+    test_settings_text_layout();
     if(argc > 1) render_main(argv[1]);
     lv_display_delete(display);
     lv_deinit();

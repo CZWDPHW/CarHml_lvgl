@@ -1,0 +1,71 @@
+/* 功能 ID 与显示顺序无关。增删入口只改 ui_settings_menu.c 的数组。 */
+#ifndef UI_SETTINGS_MENU_H
+#define UI_SETTINGS_MENU_H
+#include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+typedef enum {
+    UI_SETTINGS_ITEM_INVALID = 0,
+    UI_SETTINGS_ITEM_BACK,
+    UI_SETTINGS_ITEM_ROOT_BACK,
+    UI_SETTINGS_IT_TRIP,
+    UI_SETTINGS_IT_ASSIST,
+    UI_SETTINGS_IT_VEHICLE,
+    UI_SETTINGS_ASSIST_DRIVING,
+    UI_SETTINGS_ASSIST_PARKING,
+    UI_SETTINGS_ASSIST_CHASSIS,
+    UI_SETTINGS_ASSIST_EPS,
+    UI_SETTINGS_EPS_MODE,
+    UI_SETTINGS_PARK_MOVING_OBJECT,
+    UI_SETTINGS_PARK_FRONT_RADAR,
+    UI_SETTINGS_PARK_REAR_RADAR,
+    UI_SETTINGS_PARK_DISPLAY,
+    UI_SETTINGS_PARK_REAR_CROSS,
+    UI_SETTINGS_PARK_VOLUME,
+    UI_SETTINGS_PARK_DISTANCE,
+    UI_SETTINGS_PARK_SENSOR,
+    UI_SETTINGS_CHASSIS_TRACE,
+    UI_SETTINGS_CHASSIS_BRAKE,
+    UI_SETTINGS_DA_EMERGENCY,
+    UI_SETTINGS_DA_LANE,
+    UI_SETTINGS_DA_BLIND,
+    UI_SETTINGS_DRV_OUT_TEMP,
+    UI_SETTINGS_DRV_GEAR,
+    UI_SETTINGS_DRV_AVG_FUEL,
+    UI_SETTINGS_ECO_DISPLAY,
+    UI_SETTINGS_ECO_INDICATOR,
+    UI_SETTINGS_TURN_LANE_CHANGE,
+    UI_SETTINGS_WIPER_SPEED_SENSE,
+    UI_SETTINGS_WIPER_REAR_LINKAGE,
+    UI_SETTINGS_WIPER_MIST,
+    UI_SETTINGS_ITEM_COUNT
+} ui_settings_item_id_t;
+
+typedef enum {
+    UI_SETTINGS_MENU_ITINERARY,
+    UI_SETTINGS_MENU_ASSIST,
+    UI_SETTINGS_MENU_EPS,
+    UI_SETTINGS_MENU_PARKING,
+    UI_SETTINGS_MENU_CHASSIS,
+    UI_SETTINGS_MENU_DRIVING_ASSIST,
+    UI_SETTINGS_MENU_DRIVING_INFO,
+    UI_SETTINGS_MENU_ECO,
+    UI_SETTINGS_MENU_TURN,
+    UI_SETTINGS_MENU_WIPER,
+    UI_SETTINGS_MENU_COUNT
+} ui_settings_menu_id_t;
+
+typedef struct {
+    const ui_settings_item_id_t *items;
+    uint8_t count;
+} ui_settings_menu_t;
+
+#define UI_SETTINGS_MENU_INDEX_NONE UINT8_MAX
+const ui_settings_menu_t *ui_settings_menu_get(ui_settings_menu_id_t menu);
+/* 返回当前位置；找不到为 NONE。功能 ID 不能直接用作行下标。 */
+uint8_t ui_settings_menu_index(ui_settings_menu_id_t menu, ui_settings_item_id_t item);
+#ifdef __cplusplus
+}
+#endif
+#endif

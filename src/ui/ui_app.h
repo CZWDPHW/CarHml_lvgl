@@ -91,6 +91,9 @@ void ui_app_settings_refresh(void);
 uint32_t ui_app_center_card_mask(void);
 /* 13：返回上一级，根页则关闭；返回 true 表示本次按键已被设置页处理 */
 bool ui_app_settings_back(void);
+
+/* 只读详情页的任意按键返回；其它页面返回 false。 */
+bool ui_app_settings_dismiss_readonly(void);
 /* 26：Qt setNextOrBackIndex */
 void ui_app_settings_next_or_back(void);
 /* 设置页覆盖层根对象，未创建时为 NULL（供测试/截图遍历） */
