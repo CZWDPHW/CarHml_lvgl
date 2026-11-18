@@ -45,6 +45,8 @@ add_library(carmw STATIC
     src/car_session.c
     src/car_link.c
     src/car_port.c
+    src/car_md5.c
+    src/car_ymodem.c
     src/car_settings.c
     src/port/car_port_memory.c
 )
@@ -91,6 +93,11 @@ if(CARMW_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(carmw_settings_tests PRIVATE carmw)
     target_compile_options(carmw_settings_tests PRIVATE ${CARMW_WARN_FLAGS})
     add_test(NAME carmw_settings COMMAND carmw_settings_tests)
+
+    add_executable(carmw_ymodem_tests tests/test_ymodem.c)
+    target_link_libraries(carmw_ymodem_tests PRIVATE carmw)
+    target_compile_options(carmw_ymodem_tests PRIVATE ${CARMW_WARN_FLAGS})
+    add_test(NAME carmw_ymodem COMMAND carmw_ymodem_tests)
 
     if(UNIX)
         add_executable(carmw_log_cleanup_tests tests/test_log_cleanup.c)
