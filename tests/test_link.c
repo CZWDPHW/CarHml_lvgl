@@ -19,6 +19,15 @@ void test_link_suite(void)
     CHECK(car_link_is_running(&link));
     CHECK(strcmp(car_link_phase_name(&link), "init") == 0);
 
+    /* Exclusive upgrade ownership blocks normal commands and resets the parser
+     * on reconnect, while keeping the state store and callbacks alive. */
+    car_link_suspend(&link);
+    CHECK(!car_link_is_running(&link));
+    car_cmd_t blocked={0};
+    CHECK(!car_link_exec(&link,&blocked));
+    CHECK(car_link_resume(&link));
+    CHECK(car_link_is_running(&link));
+
     /* ---- 1. 上电后先发握手：0x00 SETGET{0x02} + 0x14 GET ---- */
     car_link_pump(&link, 0);
     n = car_port_memory_take(&mem, out, sizeof(out));

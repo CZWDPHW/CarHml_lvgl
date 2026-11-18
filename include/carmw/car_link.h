@@ -128,6 +128,11 @@ void car_link_pump(car_link_t *link, int timeout_ms);
 bool car_link_start(car_link_t *link);
 void car_link_stop(car_link_t *link);
 
+/* Owner thread only: join reader and close port before an exclusive MCU upgrade.
+ * Resume preserves vehicle state, resets parser/session and discards stale commands. */
+void car_link_suspend(car_link_t *link);
+bool car_link_resume(car_link_t *link);
+
 /* 把一条命令放进发送队列（线程安全，不阻塞）。 */
 bool car_link_exec(car_link_t *link, const car_cmd_t *command);
 

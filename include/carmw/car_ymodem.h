@@ -7,6 +7,7 @@ typedef struct {
     void *user;
     bool (*cancelled)(void *user);
     void (*progress)(void *user, unsigned percent);
+    bool (*wait_ms)(void *user, unsigned ms); /* Optional interruptible Qt EOT delay. */
     unsigned retries; /* 0 uses Qt's 4000 attempts per data block. */
 } car_ymodem_t;
 typedef enum {

@@ -445,6 +445,28 @@ bool car_link_exec(car_link_t *link, const car_cmd_t *command)
     return true;
 }
 
+void car_link_suspend(car_link_t *link)
+{
+    if(!link) return;
+    car_link_stop(link);
+    link->running=false;
+    if(link->port.close) link->port.close(link->port.ctx);
+}
+
+bool car_link_resume(car_link_t *link)
+{
+    if(!link || link->thread_started) return false;
+    car_lock_acquire(&link->lock);
+    link->tx_head=link->tx_tail=link->tx_count=0;
+    link->key_head=link->key_tail=link->key_count=0;
+    car_lock_release(&link->lock);
+    car_parser_init(&link->parser);
+    car_parser_set_policy(&link->parser,car_registry_accept,NULL);
+    car_session_init(&link->session,car_port_now(&link->port));
+    link->running=link->port.open && link->port.open(link->port.ctx);
+    return link->running;
+}
+
 /**
  * @brief 获取链接状态视图
  * @param link 链接

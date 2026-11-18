@@ -80,6 +80,7 @@ static int send_impl(car_ymodem_t *c, FILE *file, const char *name,
     }
     char hex[33]; car_md5_final(&md5,hex);
     if(strcmp(hex,expected)!=0) return CAR_YMODEM_MD5;
+    if(c->wait_ms && !c->wait_ms(c->user,1000)) return CAR_YMODEM_CANCELLED;
     bool eot_ack=false;
     for(unsigned i=0;i<30;++i) {
         const uint8_t eot=4;

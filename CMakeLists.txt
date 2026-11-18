@@ -47,6 +47,7 @@ add_library(carmw STATIC
     src/car_port.c
     src/car_md5.c
     src/car_ymodem.c
+    src/car_upgrade_files.c
     src/car_settings.c
     src/port/car_port_memory.c
 )
@@ -58,7 +59,8 @@ target_compile_options(carmw PRIVATE ${CARMW_WARN_FLAGS})
 # POSIX 串口实现 + 线程支持（板子和 Linux PC 用；MCU 移植时可以不编译这一段）
 # ---------------------------------------------------------------------------
 if(UNIX)
-    target_sources(carmw PRIVATE src/port/car_port_posix.c
+    target_sources(carmw PRIVATE src/car_upgrade.c
+                                src/port/car_port_posix.c
                                 src/car_settings_saver.c
                                 src/car_log_cleanup.c)
     find_package(Threads REQUIRED)
@@ -98,6 +100,15 @@ if(CARMW_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(carmw_ymodem_tests PRIVATE carmw)
     target_compile_options(carmw_ymodem_tests PRIVATE ${CARMW_WARN_FLAGS})
     add_test(NAME carmw_ymodem COMMAND carmw_ymodem_tests)
+
+    add_executable(carmw_upgrade_files_tests tests/test_upgrade_files.c)
+    target_link_libraries(carmw_upgrade_files_tests PRIVATE carmw)
+    target_compile_options(carmw_upgrade_files_tests PRIVATE ${CARMW_WARN_FLAGS})
+    # Fixture directories are created by the test; each run starts in a new directory.
+    add_test(NAME carmw_upgrade_files COMMAND ${CMAKE_COMMAND}
+        -DTEST_EXE=$<TARGET_FILE:carmw_upgrade_files_tests>
+        -DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/upgrade-files-test
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_upgrade_files.cmake)
 
     if(UNIX)
         add_executable(carmw_log_cleanup_tests tests/test_log_cleanup.c)
