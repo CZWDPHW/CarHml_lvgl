@@ -64,6 +64,8 @@ system_update 是在线文件覆盖，不等于系统分区 A/B。板端断电�
 ```
 
 把 [rcS 示例](../deploy/rcS-upgrade-snippet.sh) 的块加到现有 `/etc/init.d/rcS` 末尾，仅添加一次，不覆盖原来的挂载、网络等启动流程。
+watchdog 使用简单循环，不加锁、不记录 PID；由 rcS 保证只启动一次。断电后进程自然结束，下次开机由 rcS 重新启动。
+每次拉起程序重新读取 `boot_flag`，并进入该版本目录加载自己的 `assets/`；退出码 75 保留为升级重启的后备处理。
 必须保留已有 U 盘自动挂载服务；升级模块监测挂载结果，本身不执行 mount。
 持久设置仍使用 `/opt/car_dashboard/setting.cfg`。
 
