@@ -66,6 +66,8 @@ system_update 是在线文件覆盖，不等于系统分区 A/B。板端断电�
 把 [rcS 示例](../deploy/rcS-upgrade-snippet.sh) 的块加到现有 `/etc/init.d/rcS` 末尾，仅添加一次，不覆盖原来的挂载、网络等启动流程。
 watchdog 使用简单循环，不加锁、不记录 PID；由 rcS 保证只启动一次。断电后进程自然结束，下次开机由 rcS 重新启动。
 每次拉起程序重新读取 `boot_flag`，并进入该版本目录加载自己的 `assets/`；退出码 75 保留为升级重启的后备处理。
+启动恢复：优先启动 boot_flag 指定的版本，文件不存在、不可执行或启动后 5 秒内退出，视为启动失败，改试另一个版本并记录对应 boot_flag。两者都失败时，扫描 `/mnt/usb/*/car_dashboard_hml`，复制至本地临时文件、chmod 755、sync 后替换 `car_A`，写 `boot_flag=0` 再运行。超过 5 秒才退出按运行期退出处理，仍重启当前版本；这不是应用健康检查，无法识别进程活着但界面卡住的情况。
+应急恢复只放 `car_dashboard_hml` 也能执行；提供 `.md5` 时必须校验通过才复制。U 盘有 `assets/` 时一起复制到 `/opt/car/assets/`，否则使用已有资源；板子没有匹配资源时需携带完整 assets。没有可用 U 盘程序时每秒继续检查，无需正在运行的升级界面。此恢复只涉及 APP，不执行 MCU 或 system_update。
 必须保留已有 U 盘自动挂载服务；升级模块监测挂载结果，本身不执行 mount。
 持久设置仍使用 `/opt/car_dashboard/setting.cfg`。
 
@@ -76,7 +78,7 @@ MCU 同理：`md5sum firmware.bin > firmware.bin.md5`，长度必须为 1..16777
 
 APP、MCU 的本地 MD5 分别是 `/opt/car/car_dashboard_hml.md5`、`/opt/car/bin.md5`。MCU 失败保留 `mcu_flag=1`，下次启动显示中断提示，重新插入正确固件包后重试；不在没有 U 盘的情况下猜测或自动烧写缓存文件。
 全部组件结束后，只要 APP 发布或系统文件发生变更就等待 5 秒重启；单独 MCU 更新不重启 Linux。
-重启前保存设置并停止工作线程，再执行 `/sbin/reboot`；执行失败时返回 75，由 watchdog 尝试 `reboot`。普通退出/崩溃则 1 秒后重新启动。
+重启前保存设置并停止工作线程，再执行 `/sbin/reboot`；执行失败时返回 75，由 watchdog 尝试 `reboot`。运行超过 5 秒后退出则 1 秒后重新启动当前版本，启动后 5 秒内退出则依次尝试另一版本及 U 盘恢复。
 
 ## 板端程序回退
 
@@ -89,6 +91,7 @@ APP、MCU 的本地 MD5 分别是 `/opt/car/car_dashboard_hml.md5`、`/opt/car/b
 已运行：Windows/MinGW 核心链路 1743 项检查、MD5/YMODEM 模拟传输、隔离文件安装测试，以及包含升级弹窗在内的 9 项 UI 回归。
 升级弹窗 1300 项检查覆盖中英文、字体缺字、800×580 居中、文字边界、特殊方向盘路由拦截及显示/销毁；四张预览在 `docs/preview/upgrade/`。
 脚本通过 `sh -n` 语法检查。
+watchdog 的 A/B 选择、快速崩溃回退、双版本失败、USB 单文件恢复、资源复制、MD5 错误、复制失败、残留临时文件及重启请求已在 Git Bash 隔离夹具运行。测试替换了时钟、sync、reboot 等命令，不会执行主机重启；原生符号链接场景需 Linux 运行。
 
 本次 Linux 开发虚拟机不可连接，因此 Linux worker、symlink APP 发布与实际 watchdog 进程测试尚未在 Linux 运行；Windows 的 POSIX 线程声明检查不代替 Linux 编译。
 Linux 专用 APP 发布和资源回退测试已包含在 `test_upgrade_files.c`，watchdog 测试在 `test_watchdog.sh`。在 Linux 上执行：
