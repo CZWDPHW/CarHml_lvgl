@@ -57,8 +57,13 @@ static unsigned settings_cleanup_status(void)
 
 #define WINDOW_WIDTH 1920
 #define WINDOW_HEIGHT 720
-#define REFRESH_MS 20  /* 界面刷新周期 */
-#define REPORT_EVERY 3 /* PC 假 MCU 约 100ms 上报一帧车况 */
+#if defined(CARMW_PLATFORM_BOARD)
+/* Keep snapshot sampling, animation and display timers on the same cadence. */
+#define REFRESH_MS LV_DEF_REFR_PERIOD
+#else
+#define REFRESH_MS 20
+#endif
+#define REPORT_EVERY 3 /* PC 假 MCU 每 3 个刷新周期（60ms）上报一帧车况 */
 
 #if defined(CARMW_PLATFORM_BOARD)
 #define SERIAL_DEVICE "/dev/ttyS2"
@@ -74,6 +79,9 @@ static uint64_t s_perf_render_start_us;
 static uint64_t s_perf_render_total_us;
 static uint64_t s_perf_render_max_us;
 static uint32_t s_perf_render_count;
+static uint32_t s_perf_slow_render_count;
+static uint64_t s_perf_previous_render_us;
+static uint64_t s_perf_frame_gap_max_us;
 static uint64_t s_perf_flush_start_us;
 static uint64_t s_perf_flush_total_us;
 static volatile sig_atomic_t s_quit;
@@ -1216,6 +1224,11 @@ static void perf_display_event(lv_event_t *event)
     uint64_t now = perf_now_us();
     switch(lv_event_get_code(event)) {
     case LV_EVENT_RENDER_START:
+        if(s_perf_previous_render_us != 0U) {
+            uint64_t gap = now - s_perf_previous_render_us;
+            if(gap > s_perf_frame_gap_max_us) s_perf_frame_gap_max_us = gap;
+        }
+        s_perf_previous_render_us = now;
         s_perf_render_start_us = now;
         break;
     case LV_EVENT_RENDER_READY: {
@@ -1223,6 +1236,7 @@ static void perf_display_event(lv_event_t *event)
         ++s_perf_render_count;
         s_perf_render_total_us += elapsed;
         if(elapsed > s_perf_render_max_us) s_perf_render_max_us = elapsed;
+        if(elapsed > 16667U) ++s_perf_slow_render_count;
         break;
     }
     case LV_EVENT_FLUSH_START:
@@ -1251,7 +1265,8 @@ static void perf_report(uint64_t now_ms)
     }
 
     fprintf(stderr, "perf: handler=%u handler_hz=%.1f avg=%lluus max=%lluus "
-            "fps=%.1f render_avg=%lluus render_max=%lluus flush_total=%lluus window=%llums\n",
+            "fps=%.1f render_avg=%lluus render_max=%lluus slow_render=%u "
+            "frame_gap_max=%lluus flush_total=%lluus window=%llums\n",
             (unsigned)s_perf_handler_count,
             (double)s_perf_handler_count * 1000.0 / (double)elapsed_ms,
             (unsigned long long)(s_perf_handler_count != 0U ?
@@ -1261,6 +1276,8 @@ static void perf_report(uint64_t now_ms)
             (unsigned long long)(s_perf_render_count != 0U ?
                                  s_perf_render_total_us / s_perf_render_count : 0U),
             (unsigned long long)s_perf_render_max_us,
+            (unsigned)s_perf_slow_render_count,
+            (unsigned long long)s_perf_frame_gap_max_us,
             (unsigned long long)s_perf_flush_total_us,
             (unsigned long long)elapsed_ms);
     s_perf_window_start_ms = now_ms;
@@ -1270,6 +1287,8 @@ static void perf_report(uint64_t now_ms)
     s_perf_render_count = 0U;
     s_perf_render_total_us = 0U;
     s_perf_render_max_us = 0U;
+    s_perf_slow_render_count = 0U;
+    s_perf_frame_gap_max_us = 0U;
     s_perf_flush_total_us = 0U;
 }
 #endif
@@ -1312,8 +1331,8 @@ static void ui_loop(void)
         if(idle < 1U) {
             idle = 1U;
         }
-        if(idle > 20U) {
-            idle = 20U;
+        if(idle > REFRESH_MS) {
+            idle = REFRESH_MS;
         }
 
         delay.tv_sec = 0;

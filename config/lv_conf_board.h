@@ -18,7 +18,7 @@
 #define LV_USE_STDLIB_STRING LV_STDLIB_CLIB
 #define LV_USE_STDLIB_SPRINTF LV_STDLIB_CLIB
 #define LV_DPI_DEF 130
-#define LV_DEF_REFR_PERIOD 20 /* 50fps 调度目标，不保证实际绘制帧率 */
+#define LV_DEF_REFR_PERIOD 16 /* ~60fps 调度目标；实际帧率取决于绘制/提交耗时 */
 
 /* ---------------- 绘制 ---------------- */
 #define LV_USE_DRAW_SW 1

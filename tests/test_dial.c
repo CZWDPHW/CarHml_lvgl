@@ -107,6 +107,35 @@ static void test_redirect(void)
     lv_obj_delete(dial.root);
 }
 
+static void test_sixteen_ms_steps(void)
+{
+    ui_dial_t dial = {0};
+    create_dial(&dial, -1950);
+    ui_dial_set_angle(&dial, -950);
+    /* A 100ms interpolation must move on every 16ms frame, even when the
+     * same MCU snapshot is applied again between updates. */
+    int32_t previous = -1950;
+    for(unsigned elapsed = 16; elapsed <= 96; elapsed += 16) {
+        advance(16);
+        lv_anim_t *anim = lv_anim_get(dial.needle, NULL);
+        CHECK(anim != NULL);
+        if(anim != NULL) {
+            int32_t expected = -1950 + (int32_t)elapsed * 10;
+            CHECK(anim->current_value > previous);
+            CHECK(anim->current_value >= expected - 2 && anim->current_value <= expected + 2);
+            previous = anim->current_value;
+            int32_t time = anim->act_time;
+            ui_dial_set_angle(&dial, -950);
+            CHECK(lv_anim_get(dial.needle, NULL) == anim);
+            CHECK(anim->act_time == time);
+        }
+    }
+    advance(16);
+    check_angle(&dial, -950);
+    CHECK(lv_anim_get(dial.needle, NULL) == NULL);
+    lv_obj_delete(dial.root);
+}
+
 static void test_components(void)
 {
     speed_forester1_t speed = {0};
@@ -201,6 +230,7 @@ int main(void)
     lv_display_delete_refr_timer(display);
     test_same_target();
     test_redirect();
+    test_sixteen_ms_steps();
     test_components();
     test_page_lifecycle();
     lv_display_delete(display);
